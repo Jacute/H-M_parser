@@ -8,6 +8,9 @@ from re import search
 from datetime import datetime
 from config import *
 from random import random
+import shutil
+import requests
+import os
 import time
 import sys
 import traceback
@@ -51,7 +54,7 @@ class Parser():
         for categorie in categories:
             self.driver.get(categorie)
             blocks = self.driver.find_elements(By.CLASS_NAME, 'item-link')
-            for block in blocks[:3]:
+            for block in blocks:
                 product_url = block.get_attribute('href')
                 products.append(product_url)
         for product_url in products:
@@ -84,20 +87,27 @@ class Parser():
             for j in colors:
                 j.click()
                 time.sleep(TIMEOUT)
+
+                article_num = self.driver.find_element(By.CLASS_NAME, 'd1cd7b.b7f566.a0f363').text
+
                 sizes = self.driver.find_elements(By.CLASS_NAME, 'ListGrid-module--item__lHoHF')
+
+                main_photo_url = self.driver.find_element(By.XPATH, '//div[@class="product-detail-main-image-container"]/img').get_attribute('src')
+                main_photo = self.get_photo(main_photo_url, article_num)
+
+
                 for i in sizes:
                     c += 1
 
                     color = self.driver.find_element(By.CLASS_NAME, 'product-input-label').text
                     size = i.text.split('\n')[0]
 
-                    article_num = self.driver.find_element(By.CLASS_NAME, 'd1cd7b.b7f566.a0f363').text
                     article = 'H&M_' + article_num + '_' + size
 
                     rich = RICH.format(name, description, article_num)
 
                     result.append([c, article, name, price, '', 'Не облагается', '', 'Платье, сарафан женские',
-                                   '', '500', '200', '50', '200', 'main_photo_url', 'other_photos', '', '', 'H&M',
+                                   '', '500', '200', '50', '200', main_photo, 'other_photos', '', '', 'H&M',
                                    article_num[:-3], COLORS[color] if color in COLORS else 'разноцветный',
                                    str(int(size) + 6) if size.isdigit() else SIZES[size.upper()], size, self.translate(color), 'Платье', 'Женский',
                                    'платье;платье женское летнее;платье женское;сарафан женский;платье женское праздничное;платье вечернее;платье zara;zara;короткое платье;длинное платье;джинсовое платье;вязаное платье',
@@ -107,6 +117,18 @@ class Parser():
                                    '', '', '', '', '', '', '', '', '', 'Пакет', '1', '', '', '', '', '', TABLE_OF_SIZES,
                                    rich, '', '', '', '', '', '', '', '', '', '', '', '', '', 'Нет'])
         return result
+
+    def get_photo(self, url, article):
+        r = requests.get(url, stream=True)
+        name = article + '.jpeg'
+        if r.status_code == 200:
+            with open(SAVE_PHOTO_PATH + name, 'wb') as f:
+                r.raw.decode_content = True
+                shutil.copyfileobj(r.raw, f)
+            return 'http://' + HOST + '/H-M_parser/' + SAVE_PHOTO_PATH + name
+        else:
+            return 'Bad photo'
+
 
     def translate(self, text):
         translator = Translator()
@@ -142,4 +164,6 @@ def main():
 
 
 if __name__ == '__main__':
+    if 'photo' not in os.listdir():
+        os.mkdir('photo')
     main()

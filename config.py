@@ -195,3 +195,5 @@ RICH = '''{{
   "version": 0.3
 }}'''
 TIMEOUT = 0.5
+SAVE_PHOTO_PATH = 'photo/'
+HOST = '85.193.92.123'
