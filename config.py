@@ -1,4 +1,4 @@
-CATEGORIES = ['https://www2.hm.com/pl_pl/ona/produkty/sukienki.html']
+CATEGORIES = ['https://www2.hm.com/pl_pl/ona/produkty/sukienki.html?sort=stock&image-size=small&image=model&offset=0&page-size=720']
 SIZES = {
     "XXS":"38",
     "XS":"40",
