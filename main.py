@@ -34,6 +34,9 @@ class Parser():
             options.add_argument(
                 "user-agent=Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:84.0) Gecko/20100101 Firefox/84.0")
 
+            # options.add_argument('--disable-dev-shm-usage')
+            # options.add_argument('--no-sandbox')
+
             driver = webdriver.Chrome(
                 service=Service(ChromeDriverManager().install()),
                 options=options
@@ -93,8 +96,10 @@ class Parser():
                 sizes = self.driver.find_elements(By.CLASS_NAME, 'ListGrid-module--item__lHoHF')
 
                 main_photo_url = self.driver.find_element(By.XPATH, '//div[@class="product-detail-main-image-container"]/img').get_attribute('src')
-                main_photo = self.get_photo(main_photo_url, article_num)
+                main_photo = self.get_photo(main_photo_url, str(article_num) + '_0.jpeg')
 
+                other_photo_urls = self.driver.find_elements(By.XPATH, '//figure[@class="pdp-secondary-image pdp-image"]/img')
+                other_photo = ','.join([self.get_photo('https:' + other_photo_urls[i].get_attribute('src'), article_num + '_' + str(i + 1) + '.webp') for i in range(len(other_photo_urls))])
 
                 for i in sizes:
                     c += 1
@@ -107,7 +112,7 @@ class Parser():
                     rich = RICH.format(name, description, article_num)
 
                     result.append([c, article, name, price, '', 'Не облагается', '', 'Платье, сарафан женские',
-                                   '', '500', '200', '50', '200', main_photo, 'other_photos', '', '', 'H&M',
+                                   '', '500', '200', '50', '200', main_photo, other_photo, '', '', 'H&M',
                                    article_num[:-3], COLORS[color] if color in COLORS else 'разноцветный',
                                    str(int(size) + 6) if size.isdigit() else SIZES[size.upper()], size, self.translate(color), 'Платье', 'Женский',
                                    'платье;платье женское летнее;платье женское;сарафан женский;платье женское праздничное;платье вечернее;платье zara;zara;короткое платье;длинное платье;джинсовое платье;вязаное платье',
@@ -118,9 +123,8 @@ class Parser():
                                    rich, '', '', '', '', '', '', '', '', '', '', '', '', '', 'Нет'])
         return result
 
-    def get_photo(self, url, article):
+    def get_photo(self, url, name):
         r = requests.get(url, stream=True)
-        name = article + '.jpeg'
         if r.status_code == 200:
             with open(SAVE_PHOTO_PATH + name, 'wb') as f:
                 r.raw.decode_content = True
