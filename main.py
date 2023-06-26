@@ -2,6 +2,7 @@ from openpyxl import load_workbook
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from selenium.common.exceptions import NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
 from googletrans import Translator
 from re import search
@@ -14,13 +15,21 @@ import os
 import time
 import sys
 import traceback
+import argparse
 
 
 class Parser():
     def __init__(self):
-        self.driver = self.get_driver()
 
-    def get_driver(self, headless=False):
+        parser = argparse.ArgumentParser(description='Process some integers.')
+        parser.add_argument('--headless', action='store_true', help='headless')
+        args = parser.parse_args()
+        if args.headless:
+            self.driver = self.get_driver(True)
+        else:
+            self.driver = self.get_driver(False)
+
+    def get_driver(self, headless):
         try:
             options = webdriver.ChromeOptions()
             if headless:
@@ -56,6 +65,21 @@ class Parser():
         c = 0
         for categorie in categories:
             self.driver.get(categorie)
+
+            """# scroll page
+            while self.check_exists_by_xpath('//button[@class="button js-load-more "]'):
+                while True:
+                    scroll_height = 2000
+                    document_height_before = self.driver.execute_script("return document.documentElement.scrollHeight")
+                    self.driver.execute_script(f"window.scrollTo(0, {document_height_before + scroll_height});")
+                    time.sleep(1.5)
+                    document_height_after = self.driver.execute_script("return document.documentElement.scrollHeight")
+                    if document_height_after == document_height_before:
+                        self.driver.execute_script(f"window.scrollTo(0, {document_height_before - scroll_height});")
+                        break
+                self.driver.find_element(By.XPATH, '//button[@class="button js-load-more "]').click()
+                time.sleep(TIMEOUT)"""
+
             blocks = self.driver.find_elements(By.CLASS_NAME, 'item-link')
             for block in blocks:
                 product_url = block.get_attribute('href')
@@ -122,6 +146,13 @@ class Parser():
                                    '', '', '', '', '', '', '', '', '', 'Пакет', '1', '', '', '', '', '', TABLE_OF_SIZES,
                                    rich, '', '', '', '', '', '', '', '', '', '', '', '', '', 'Нет'])
         return result
+
+    def check_exists_by_xpath(self, xpath):
+        try:
+            self.driver.find_element(By.XPATH, xpath)
+        except NoSuchElementException:
+            return False
+        return True
 
     def get_photo(self, url, name):
         r = requests.get(url, stream=True)
