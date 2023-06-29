@@ -2,8 +2,10 @@ from openpyxl import load_workbook
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.support.ui import WebDriverWait
 from googletrans import Translator
 from re import search
 from datetime import datetime
@@ -53,6 +55,9 @@ class Parser():
             )
             driver.set_window_size(1920, 1080)
             driver.implicitly_wait(10)
+
+            self.wait = WebDriverWait(driver, 40)
+
             return driver
         except Exception as e:
             print('Неудачная настройка браузера!')
@@ -90,16 +95,19 @@ class Parser():
             print(f'{products.index(product_url) + 1} of 200')
             self.driver.get(product_url)
 
-            self.driver.execute_script("window.scrollTo(0, 1100)")
+            self.driver.execute_script("window.scrollTo(0, 1000)")
 
             material_btn = self.driver.find_element(By.ID, 'toggle-materialsAndSuppliersAccordion')
             material_btn.click()
-            time.sleep(TIMEOUT)
+            self.wait.until(EC.visibility_of_element_located((By.CLASS_NAME, 'd1cd7b.a09145.efef57')))
             material = self.driver.find_element(By.CLASS_NAME, 'd1cd7b.a09145.efef57').text
 
+            self.wait.until(EC.visibility_of_element_located((By.CLASS_NAME,
+                                                         "f05bd4.cf896c.c63d19.aaa2a2.d28f9c")))
             creator_btn = self.driver.find_element(By.CLASS_NAME, 'f05bd4.cf896c.c63d19.aaa2a2.d28f9c')
             creator_btn.click()
-            time.sleep(TIMEOUT)
+
+            self.wait.until(EC.visibility_of_element_located((By.XPATH, '//h2[@class="fa226d ca21a4"]')))
             creator = self.translate(self.driver.find_element(By.XPATH, '//h2[@class="fa226d ca21a4"]').text)
             if creator == 'Инди':
                 creator = 'Индия'
