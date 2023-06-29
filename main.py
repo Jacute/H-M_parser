@@ -12,6 +12,7 @@ from random import random
 import shutil
 import requests
 import os
+import logging
 import time
 import sys
 import traceback
@@ -83,9 +84,10 @@ class Parser():
             blocks = self.driver.find_elements(By.CLASS_NAME, 'item-link')
             for block in blocks:
                 product_url = block.get_attribute('href')
-                products.append(product_url)
-        for product_url in products:
-            print(f'{products.index(product_url) + 1} of {len(products)}')
+                if product_url != 'https://www2.hm.com/pl_pl/index.html':
+                    products.append(product_url)
+        for product_url in products[:200]:
+            print(f'{products.index(product_url) + 1} of 200')
             self.driver.get(product_url)
 
             self.driver.execute_script("window.scrollTo(0, 1100)")
@@ -98,8 +100,10 @@ class Parser():
             creator_btn = self.driver.find_element(By.CLASS_NAME, 'f05bd4.cf896c.c63d19.aaa2a2.d28f9c')
             creator_btn.click()
             time.sleep(TIMEOUT)
-            creator = self.driver.find_element(By.XPATH, '//h2[@class="fa226d ca21a4"]').text
-            close = self.driver.find_element(By.CLASS_NAME, 'b395d2.fe373a.dfc6c7.ee87dd')
+            creator = self.translate(self.driver.find_element(By.XPATH, '//h2[@class="fa226d ca21a4"]').text)
+            if creator == 'Инди':
+                creator = 'Индия'
+            close = self.driver.find_element(By.XPATH, '//div[@class="f10030"]/button')
             close.click()
             time.sleep(TIMEOUT)
 
@@ -108,9 +112,11 @@ class Parser():
             description = self.translate(self.driver.find_element(By.CLASS_NAME, 'd1cd7b.b475fe.e2b79d').text).strip()
 
             name = self.translate(self.driver.find_element(By.ID, 'js-product-name').text).strip()
+
             price = self.driver.find_element(By.ID, 'product-price').text.replace(' PLN', '')
 
             colors = self.driver.find_elements(By.XPATH, '//li[@class="list-item"]/a')
+            if len(colors) >= 8: colors = colors[:7]
             for j in colors:
                 j.click()
                 time.sleep(TIMEOUT)
@@ -128,7 +134,7 @@ class Parser():
                 for i in sizes:
                     c += 1
 
-                    color = self.driver.find_element(By.CLASS_NAME, 'product-input-label').text
+                    color = self.translate(self.driver.find_element(By.CLASS_NAME, 'product-input-label').text)
                     size = i.text.split('\n')[0]
 
                     article = 'H&M_' + article_num + '_' + size
@@ -138,9 +144,9 @@ class Parser():
                     result.append([c, article, name, price, '', 'Не облагается', '', 'Платье, сарафан женские',
                                    '', '500', '200', '50', '200', main_photo, other_photo, '', '', 'H&M',
                                    article_num[:-3], COLORS[color] if color in COLORS else 'разноцветный',
-                                   str(int(size) + 6) if size.isdigit() else SIZES[size.upper()], size, self.translate(color), 'Платье', 'Женский',
+                                   str(int(size) + 6) if size.isdigit() else SIZES[size.upper()], size, color, 'Платье', 'Женский',
                                    'платье;платье женское летнее;платье женское;сарафан женский;платье женское праздничное;платье вечернее;платье zara;zara;короткое платье;длинное платье;джинсовое платье;вязаное платье',
-                                   'Взрослая', 'На любой сезон', '175 см', '', '44', 'Базовая коллекция', self.translate(creator),
+                                   'Взрослая', 'На любой сезон', '175 см', '', '44', 'Базовая коллекция', creator,
                                    '', '', 'Машинная стирка при температуре до 30ºC с коротким циклом отжима.Отбеливание запрещено.Гладить при температуре до 110ºC .Химчистка с тетрахлорэтиленом.Не использовать машинную сушку',
                                    '', '', self.translate(material), '', '', '', '', '', 'Повседневный;праздничный;вечерний', '',
                                    '', '', '', '', '', '', '', '', '', 'Пакет', '1', '', '', '', '', '', TABLE_OF_SIZES,
@@ -164,7 +170,6 @@ class Parser():
         else:
             return 'Bad photo'
 
-
     def translate(self, text):
         translator = Translator()
         result = translator.translate(text, dest='ru')
@@ -185,9 +190,10 @@ class Parser():
             result = self.parse(CATEGORIES)
             self.save(result)
             print('--- END PARSING ---')
-        except Exception:
+        except Exception as e:
             print(self.driver.current_url)
             print(traceback.format_exc())
+            logging.error("ERROR")
         finally:
             self.driver.close()
             self.driver.quit()

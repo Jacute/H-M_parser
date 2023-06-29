@@ -2,13 +2,17 @@ CATEGORIES = ['https://www2.hm.com/pl_pl/ona/produkty/sukienki.html?sort=stock&i
 SIZES = {
     "XXS":"38",
     "XS":"40",
+    "XS/S":"40;44",
     "S":"42;44",
     "M":"46;48",
+    "M/L":"46;52",
     "L":"50;52",
     "XL":"54;56",
+    "XL/XXL":"54;60",
     "XXL":"58;60",
     "3XL":"62;64",
     "4XL":"66;68",
+    "3XL/4XL":"62;68"
 }
 
 COLORS = {
