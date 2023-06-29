@@ -91,8 +91,8 @@ class Parser():
                 product_url = block.get_attribute('href')
                 if product_url != 'https://www2.hm.com/pl_pl/index.html':
                     products.append(product_url)
-        for product_url in products[:200]:
-            print(f'{products.index(product_url) + 1} of 200')
+        for product_url in products:
+            print(f'{products.index(product_url) + 1} of {len(products)}')
             self.driver.get(product_url)
 
             self.driver.execute_script("window.scrollTo(0, 1000)")
@@ -183,20 +183,20 @@ class Parser():
         result = translator.translate(text, dest='ru')
         return result.text
 
-    def save(self, result):
+    def save(self, result, name):
         wb = load_workbook(filename='example.xlsx')
         ws = wb['Шаблон для поставщика']
         for row in range(len(result)):
             for col in range(len(result[row])):
                 ws.cell(row=4 + row, column=1 + col).value = result[row][col]
 
-        wb.save("h&m_test.xlsx")
+        wb.save(f"{name}_{datetime.now()}.xlsx")
 
     def start(self):
         try:
             print('--- START PARSING ---')
             result = self.parse(CATEGORIES)
-            self.save(result)
+            self.save(result, 'dresses')
             print('--- END PARSING ---')
         except Exception as e:
             print(self.driver.current_url)
