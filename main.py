@@ -134,6 +134,7 @@ class Parser():
 
                 sizes = self.driver.find_elements(By.CLASS_NAME, 'ListGrid-module--item__lHoHF')
 
+                self.wait.until(EC.visibility_of_element_located((By.XPATH, '//div[@class="product-detail-main-image-container"]/img')))
                 main_photo_url = self.driver.find_element(By.XPATH, '//div[@class="product-detail-main-image-container"]/img').get_attribute('src')
                 main_photo = self.get_photo(main_photo_url, str(article_num) + '_0.jpeg')
 
