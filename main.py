@@ -91,6 +91,7 @@ class Parser():
                 product_url = block.get_attribute('href')
                 if product_url != 'https://www2.hm.com/pl_pl/index.html':
                     products.append(product_url)
+        products = self.delete_duplicate(products)
         for product_url in products:
             print(f'{products.index(product_url) + 1} of {len(products)}')
             self.driver.get(product_url)
@@ -177,6 +178,17 @@ class Parser():
             return 'http://' + HOST + '/H-M_parser/' + SAVE_PHOTO_PATH + name
         else:
             return 'Bad photo'
+
+    def delete_duplicate(self, urls):
+        result = []
+        set_of_articles = set()
+        for url in urls:
+            article = search(r'[0-9]{5,}', url)[0][:-3]
+            if article not in set_of_articles:
+                set_of_articles.add(article)
+                result.append(url)
+        return result
+
 
     def translate(self, text):
         translator = Translator()
