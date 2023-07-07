@@ -21,9 +21,11 @@ import traceback
 import argparse
 
 
-class Parser():
-    def __init__(self):
-
+class Parser:
+    def __init__(self, choice):
+        self.result = []
+        self.choice = choice
+        self.categorie = CATEGORIES[choice]
         parser = argparse.ArgumentParser(description='Process some integers.')
         parser.add_argument('--headless', action='store_true', help='headless')
         args = parser.parse_args()
@@ -54,9 +56,9 @@ class Parser():
                 options=options
             )
             driver.set_window_size(1920, 1080)
-            driver.implicitly_wait(10)
+            driver.implicitly_wait(60)
 
-            self.wait = WebDriverWait(driver, 40)
+            self.wait = WebDriverWait(driver, 60)
 
             return driver
         except Exception as e:
@@ -65,72 +67,75 @@ class Parser():
             print(input('Нажмите ENTER, чтобы закрыть эту программу'))
             sys.exit()
 
-    def parse(self, categories):
-        result = []
+    def parse_dresses(self):
         products = []
         c = 0
-        for categorie in categories:
-            self.driver.get(categorie)
+        self.driver.get(self.categorie)
 
-            """# scroll page
-            while self.check_exists_by_xpath('//button[@class="button js-load-more "]'):
-                while True:
-                    scroll_height = 2000
-                    document_height_before = self.driver.execute_script("return document.documentElement.scrollHeight")
-                    self.driver.execute_script(f"window.scrollTo(0, {document_height_before + scroll_height});")
-                    time.sleep(1.5)
-                    document_height_after = self.driver.execute_script("return document.documentElement.scrollHeight")
-                    if document_height_after == document_height_before:
-                        self.driver.execute_script(f"window.scrollTo(0, {document_height_before - scroll_height});")
-                        break
-                self.driver.find_element(By.XPATH, '//button[@class="button js-load-more "]').click()
-                time.sleep(TIMEOUT)"""
+        """# scroll page
+        while self.check_exists_by_xpath('//button[@class="button js-load-more "]'):
+            while True:
+                scroll_height = 2000
+                document_height_before = self.driver.execute_script("return document.documentElement.scrollHeight")
+                self.driver.execute_script(f"window.scrollTo(0, {document_height_before + scroll_height});")
+                time.sleep(1.5)
+                document_height_after = self.driver.execute_script("return document.documentElement.scrollHeight")
+                if document_height_after == document_height_before:
+                    self.driver.execute_script(f"window.scrollTo(0, {document_height_before - scroll_height});")
+                    break
+            self.driver.find_element(By.XPATH, '//button[@class="button js-load-more "]').click()
+            time.sleep(TIMEOUT)"""
 
-            blocks = self.driver.find_elements(By.CLASS_NAME, 'item-link')
-            for block in blocks:
-                product_url = block.get_attribute('href')
-                if product_url != 'https://www2.hm.com/pl_pl/index.html':
-                    products.append(product_url)
+        blocks = self.driver.find_elements(By.CLASS_NAME, 'item-link')
+        for block in blocks:
+            product_url = block.get_attribute('href')
+            if product_url != 'https://www2.hm.com/pl_pl/index.html':
+                products.append(product_url)
         products = self.delete_duplicate(products)
-        for product_url in products:
+        for product_url in products[:200]:
             print(f'{products.index(product_url) + 1} of {len(products)}')
             self.driver.get(product_url)
 
             self.driver.execute_script("window.scrollTo(0, 1000)")
 
-            material_btn = self.driver.find_element(By.ID, 'toggle-materialsAndSuppliersAccordion')
-            material_btn.click()
-            self.wait.until(EC.visibility_of_element_located((By.CLASS_NAME, 'd1cd7b.a09145.efef57')))
-            material = self.driver.find_element(By.CLASS_NAME, 'd1cd7b.a09145.efef57').text
-
-            self.wait.until(EC.visibility_of_element_located((By.CLASS_NAME,
-                                                         "f05bd4.cf896c.c63d19.aaa2a2.d28f9c")))
-            creator_btn = self.driver.find_element(By.CLASS_NAME, 'f05bd4.cf896c.c63d19.aaa2a2.d28f9c')
-            creator_btn.click()
-
-            self.wait.until(EC.visibility_of_element_located((By.XPATH, '//h2[@class="fa226d ca21a4"]')))
-            creator = self.translate(self.driver.find_element(By.XPATH, '//h2[@class="fa226d ca21a4"]').text)
-            if creator == 'Инди':
-                creator = 'Индия'
-            close = self.driver.find_element(By.XPATH, '//div[@class="f10030"]/button')
-            close.click()
-            time.sleep(TIMEOUT)
-
             description_btn = self.driver.find_element(By.ID, 'toggle-descriptionAccordion')
             description_btn.click()
             description = self.translate(self.driver.find_element(By.CLASS_NAME, 'd1cd7b.b475fe.e2b79d').text).strip()
+
+            try:
+                material_btn = self.driver.find_element(By.ID, 'toggle-materialsAndSuppliersAccordion')
+                material_btn.click()
+                self.wait.until(EC.visibility_of_element_located((By.CLASS_NAME, 'd1cd7b.a09145.efef57')))
+                material = self.driver.find_element(By.CLASS_NAME, 'd1cd7b.a09145.efef57').text
+            except Exception:
+                material = 'Bad material'
+
+            if self.check_exists_by_xpath('//button[@class="f05bd4 cf896c c63d19 aaa2a2 d28f9c"]'):
+                creator_btn = self.driver.find_element(By.XPATH, '//button[@class="f05bd4 cf896c c63d19 aaa2a2 d28f9c"]')
+                creator_btn.click()
+                time.sleep(TIMEOUT)
+
+                self.wait.until(EC.visibility_of_element_located((By.XPATH, '//h2[@class="fa226d ca21a4"]')))
+                creator = self.translate(self.driver.find_element(By.XPATH, '//h2[@class="fa226d ca21a4"]').text)
+                if creator == 'Инди':
+                    creator = 'Индия'
+                close = self.driver.find_element(By.XPATH, '//div[@class="f10030"]/button')
+                close.click()
+                time.sleep(TIMEOUT)
+            else:
+                creator = 'Bad creator'
 
             name = self.translate(self.driver.find_element(By.ID, 'js-product-name').text).strip()
 
             price = self.driver.find_element(By.ID, 'product-price').text.replace(' PLN', '')
 
-            colors = self.driver.find_elements(By.XPATH, '//li[@class="list-item"]/a')
+            colors = [j.get_attribute('href') for j in self.driver.find_elements(By.XPATH, '//li[@class="list-item"]/a')]
             if len(colors) >= 8: colors = colors[:7]
             for j in colors:
-                j.click()
+                self.driver.get(j)
                 time.sleep(TIMEOUT)
 
-                article_num = self.driver.find_element(By.CLASS_NAME, 'd1cd7b.b7f566.a0f363').text
+                article_num = search('[0-9]{5,}', self.driver.current_url)[0]
 
                 sizes = self.driver.find_elements(By.CLASS_NAME, 'ListGrid-module--item__lHoHF')
 
@@ -144,24 +149,159 @@ class Parser():
                 for i in sizes:
                     c += 1
 
-                    color = self.translate(self.driver.find_element(By.CLASS_NAME, 'product-input-label').text)
+                    color = self.driver.find_element(By.CLASS_NAME, 'product-input-label').text
+
                     size = i.text.split('\n')[0]
 
                     article = 'H&M_' + article_num + '_' + size
 
                     rich = RICH.format(name, description, article_num)
 
-                    result.append([c, article, name, price, '', 'Не облагается', '', 'Платье, сарафан женские',
-                                   '', '500', '200', '50', '200', main_photo, other_photo, '', '', 'H&M',
-                                   article_num[:-3], COLORS[color] if color in COLORS else 'разноцветный',
-                                   str(int(size) + 6) if size.isdigit() else SIZES[size.upper()], size, color, 'Платье', 'Женский',
-                                   'платье;платье женское летнее;платье женское;сарафан женский;платье женское праздничное;платье вечернее;платье zara;zara;короткое платье;длинное платье;джинсовое платье;вязаное платье',
-                                   'Взрослая', 'На любой сезон', '175 см', '', '44', 'Базовая коллекция', creator,
-                                   '', '', 'Машинная стирка при температуре до 30ºC с коротким циклом отжима.Отбеливание запрещено.Гладить при температуре до 110ºC .Химчистка с тетрахлорэтиленом.Не использовать машинную сушку',
-                                   '', '', self.translate(material), '', '', '', '', '', 'Повседневный;праздничный;вечерний', '',
-                                   '', '', '', '', '', '', '', '', '', 'Пакет', '1', '', '', '', '', '', TABLE_OF_SIZES,
-                                   rich, '', '', '', '', '', '', '', '', '', '', '', '', '', 'Нет'])
-        return result
+                    DRESS_COLUMNS['№'] = c
+                    DRESS_COLUMNS['Артикул*'] = article
+                    DRESS_COLUMNS['Название товара'] = name
+                    DRESS_COLUMNS['Цена, руб.*'] = price
+                    DRESS_COLUMNS['Ссылка на главное фото*'] = main_photo
+                    DRESS_COLUMNS['Ссылки на дополнительные фото'] = other_photo
+                    DRESS_COLUMNS['Объединить на одной карточке*'] = article_num[:-3]
+                    DRESS_COLUMNS['Цвет товара*'] = COLORS[color] if color in COLORS else 'разноцветный'
+                    if size.isdigit():
+                        DRESS_COLUMNS['Российский размер*'] = str(int(size) + 6)
+                    else:
+                        try:
+                            DRESS_COLUMNS['Российский размер*'] = DRESS_SIZES[size.upper()]
+                        except:
+                            DRESS_COLUMNS['Российский размер*'] = 'Bad size'
+                    DRESS_COLUMNS['Размер производителя'] = size
+                    DRESS_COLUMNS['Название цвета'] = self.translate(color)
+                    DRESS_COLUMNS['Страна-изготовитель'] = creator
+                    DRESS_COLUMNS['Состав материала'] = self.translate(material)
+                    DRESS_COLUMNS['Таблица размеров JSON'] = TABLE_OF_SIZES
+                    DRESS_COLUMNS['Rich-контент JSON'] = rich
+
+                    self.result.append(DRESS_COLUMNS)
+
+    def parse_jeans(self):
+        products = []
+        c = 0
+        self.driver.get(self.categorie)
+
+        """# scroll page
+        while self.check_exists_by_xpath('//button[@class="button js-load-more "]'):
+            while True:
+                scroll_height = 2000
+                document_height_before = self.driver.execute_script("return document.documentElement.scrollHeight")
+                self.driver.execute_script(f"window.scrollTo(0, {document_height_before + scroll_height});")
+                time.sleep(1.5)
+                document_height_after = self.driver.execute_script("return document.documentElement.scrollHeight")
+                if document_height_after == document_height_before:
+                    self.driver.execute_script(f"window.scrollTo(0, {document_height_before - scroll_height});")
+                    break
+            self.driver.find_element(By.XPATH, '//button[@class="button js-load-more "]').click()
+            time.sleep(TIMEOUT)"""
+
+        blocks = self.driver.find_elements(By.CLASS_NAME, 'item-link')
+        for block in blocks:
+            product_url = block.get_attribute('href')
+            if product_url != 'https://www2.hm.com/pl_pl/index.html':
+                products.append(product_url)
+        products = self.delete_duplicate(products)
+        for product_url in products[:200]:
+            print(f'{products.index(product_url) + 1} of {len(products)}')
+            self.driver.get(product_url)
+
+            self.driver.execute_script("window.scrollTo(0, 1000)")
+
+            description_btn = self.driver.find_element(By.ID, 'toggle-descriptionAccordion')
+            description_btn.click()
+            description = self.translate(self.driver.find_element(By.CLASS_NAME, 'd1cd7b.b475fe.e2b79d').text).strip()
+
+            try:
+                material_btn = self.driver.find_element(By.ID, 'toggle-materialsAndSuppliersAccordion')
+                material_btn.click()
+                self.wait.until(EC.visibility_of_element_located((By.CLASS_NAME, 'd1cd7b.a09145.efef57')))
+                material = self.driver.find_element(By.CLASS_NAME, 'd1cd7b.a09145.efef57').text
+            except Exception:
+                material = 'Bad material'
+
+            if self.check_exists_by_xpath('//button[@class="f05bd4 cf896c c63d19 aaa2a2 d28f9c"]'):
+                creator_btn = self.driver.find_element(By.XPATH,
+                                                       '//button[@class="f05bd4 cf896c c63d19 aaa2a2 d28f9c"]')
+                creator_btn.click()
+                time.sleep(TIMEOUT)
+
+                self.wait.until(EC.visibility_of_element_located((By.XPATH, '//h2[@class="fa226d ca21a4"]')))
+                creator = self.translate(self.driver.find_element(By.XPATH, '//h2[@class="fa226d ca21a4"]').text)
+                if creator == 'Инди':
+                    creator = 'Индия'
+                close = self.driver.find_element(By.XPATH, '//div[@class="f10030"]/button')
+                close.click()
+                time.sleep(TIMEOUT)
+            else:
+                creator = 'Bad creator'
+
+            name = self.translate(self.driver.find_element(By.ID, 'js-product-name').text).strip()
+
+            price = self.driver.find_element(By.ID, 'product-price').text.replace(' PLN', '')
+
+            colors = [j.get_attribute('href') for j in
+                      self.driver.find_elements(By.XPATH, '//li[@class="list-item"]/a')]
+            if len(colors) >= 8: colors = colors[:7]
+            for j in colors:
+                self.driver.get(j)
+                time.sleep(TIMEOUT)
+
+                article_num = search('[0-9]{5,}', self.driver.current_url)[0]
+
+                sizes = self.driver.find_elements(By.CLASS_NAME, 'ListGrid-module--item__lHoHF')
+
+                self.wait.until(EC.visibility_of_element_located(
+                    (By.XPATH, '//div[@class="product-detail-main-image-container"]/img')))
+                main_photo_url = self.driver.find_element(By.XPATH,
+                                                          '//div[@class="product-detail-main-image-container"]/img').get_attribute(
+                    'src')
+                main_photo = self.get_photo(main_photo_url, str(article_num) + '_0.jpeg')
+
+                other_photo_urls = self.driver.find_elements(By.XPATH,
+                                                             '//figure[@class="pdp-secondary-image pdp-image"]/img')
+                other_photo = ','.join([self.get_photo('https:' + other_photo_urls[i].get_attribute('src'),
+                                                       article_num + '_' + str(i + 1) + '.webp') for i in
+                                        range(len(other_photo_urls))])
+
+                for i in sizes:
+                    c += 1
+
+                    color = self.driver.find_element(By.CLASS_NAME, 'product-input-label').text
+
+                    size = i.text.split('\n')[0]
+
+                    article = 'H&M_' + article_num + '_' + size
+
+                    rich = RICH.format(name, description, article_num)
+
+                    DRESS_COLUMNS['№'] = c
+                    DRESS_COLUMNS['Артикул*'] = article
+                    DRESS_COLUMNS['Название товара'] = name
+                    DRESS_COLUMNS['Цена, руб.*'] = price
+                    DRESS_COLUMNS['Ссылка на главное фото*'] = main_photo
+                    DRESS_COLUMNS['Ссылки на дополнительные фото'] = other_photo
+                    DRESS_COLUMNS['Объединить на одной карточке*'] = article_num[:-3]
+                    DRESS_COLUMNS['Цвет товара*'] = COLORS[color] if color in COLORS else 'разноцветный'
+                    if size.isdigit():
+                        DRESS_COLUMNS['Российский размер*'] = str(int(size) + 6)
+                    else:
+                        try:
+                            DRESS_COLUMNS['Российский размер*'] = DRESS_SIZES[size.upper()]
+                        except:
+                            DRESS_COLUMNS['Российский размер*'] = 'Bad size'
+                    DRESS_COLUMNS['Размер производителя'] = size
+                    DRESS_COLUMNS['Название цвета'] = self.translate(color)
+                    DRESS_COLUMNS['Страна-изготовитель'] = creator
+                    DRESS_COLUMNS['Состав материала'] = self.translate(material)
+                    DRESS_COLUMNS['Таблица размеров JSON'] = TABLE_OF_SIZES
+                    DRESS_COLUMNS['Rich-контент JSON'] = rich
+
+                    self.result.append(DRESS_COLUMNS)
 
     def check_exists_by_xpath(self, xpath):
         try:
@@ -190,42 +330,75 @@ class Parser():
                 result.append(url)
         return result
 
-
     def translate(self, text):
         translator = Translator()
-        result = translator.translate(text, dest='ru')
-        return result.text
+        while True:
+            try:
+                result = translator.translate(text, dest='ru')
+                return result.text
+            except:
+                pass
 
     def save(self, result, name):
-        wb = load_workbook(filename='example.xlsx')
+        wb = load_workbook(filename=f'examples/{name}_example.xlsx')
         ws = wb['Шаблон для поставщика']
-        for row in range(len(result)):
-            for col in range(len(result[row])):
-                ws.cell(row=4 + row, column=1 + col).value = result[row][col]
+        alphabet = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+        cols = []
+        for col in alphabet:
+            value = ws[col + '2'].value
+            if value:
+                cols.append(value)
+        for col1 in alphabet:
+            for col2 in alphabet:
+                value = ws[col1 + col2 + '2'].value
+                if value:
+                    cols.append(value)
 
-        wb.save(f"{name}_{datetime.now()}.xlsx")
+        for row in range(len(result)):
+            for col in range(len(cols)):
+                if cols[col] not in result[row]:
+                    ws.cell(row=4 + row, column=1 + col).value = ''
+                else:
+                    ws.cell(row=4 + row, column=1 + col).value = result[row][cols[col]]
+
+        wb.save(SAVE_XLSX_PATH + f"{name}_{datetime.now()}.xlsx")
 
     def start(self):
         try:
             print('--- START PARSING ---')
-            result = self.parse(CATEGORIES)
-            self.save(result, 'dresses')
+            if self.choice == 0:
+                self.parse_dresses()
+                self.save(self.result, 'dresses')
+            elif self.choice == 1:
+                self.parse_dresses()
+                self.save(self.result, 'baby_dresses')
+            elif self.choice == 2:
+                self.parse_dresses()
+                self.save(self.result, "men's_jeans")
             print('--- END PARSING ---')
         except Exception as e:
             print(self.driver.current_url)
             print(traceback.format_exc())
             logging.error("ERROR")
+            html = self.driver.page_source
+            with open('last_page.html', 'w') as f:
+                data = f.write(html)
+            self.save(self.result, 'dresses_' + str(len(self.result)))
         finally:
             self.driver.close()
             self.driver.quit()
 
 
-def main():
-    parser = Parser()
+def main(choice):
+    parser = Parser(choice)
     parser.start()
 
 
 if __name__ == '__main__':
     if 'photo' not in os.listdir():
         os.mkdir('photo')
-    main()
+    if 'xlsx' not in os.listdir():
+        os.mkdir('xlsx')
+    print('Выберите категорию для парсинга:\n0 - платья\n1 - детские платья\n2 - мужские джинсы')
+    choice = int(input())
+    main(choice)

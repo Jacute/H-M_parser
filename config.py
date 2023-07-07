@@ -1,8 +1,13 @@
 CATEGORIES = ['https://www2.hm.com/pl_pl/ona/produkty/sukienki.html?sort=stock&image-size=small&image=model&offset=0&page-size=500',
-              # 'https://www2.hm.com/pl_pl/dziecko/ubrania-dla-dziewczynek/odziez/sukienki.html?sort=stock&image-size=small&image=model&offset=0&page-size=500'
+              'https://www2.hm.com/pl_pl/dziecko/ubrania-dla-dziewczynek/odziez/sukienki.html?sort=stock&image-size=small&image=model&offset=0&page-size=500',
+              'https://www2.hm.com/pl_pl/on/produkty/dzinsy.html?sort=stock&image-size=small&image=model&offset=0&page-size=500'
               ]
 # ?sort=stock&image-size=small&image=model&offset=0&page-size=500
-SIZES = {
+TIMEOUT = 0.5
+SAVE_PHOTO_PATH = 'photo/'
+HOST = '85.193.92.123'
+SAVE_XLSX_PATH = 'xlsx/'
+DRESS_SIZES = {
     "XXS":"38",
     "XS":"40",
     "XS/S":"40;44",
@@ -15,7 +20,13 @@ SIZES = {
     "XXL":"58;60",
     "3XL":"62;64",
     "4XL":"66;68",
-    "3XL/4XL":"62;68"
+    "3XL/4XL":"62;68",
+    "3XS":"36",
+    "92 (1½-2Y)": "92",
+    "98/104 (2-4Y)": "98/104",
+    "110/116 (4-6Y)": "110/116",
+    "122/128 (6-8Y)": "122/128",
+    "134/140 (8-10Y)": "134/140"
 }
 
 COLORS = {
@@ -201,6 +212,26 @@ RICH = '''{{
   ],
   "version": 0.3
 }}'''
-TIMEOUT = 0.5
-SAVE_PHOTO_PATH = 'photo/'
-HOST = '85.193.92.123'
+DRESS_COLUMNS = {
+    "НДС, %*": "Не облагается",
+    "Коммерческий тип*": "Платье, сарафан женские",
+    "Вес в упаковке, г*": "500",
+    "Ширина упаковки, мм*": "200",
+    "Высота упаковки, мм*": "50",
+    "Длина упаковки, мм*": "200",
+    "Бренд в одежде и обуви*": "H&M",
+    "Цвет товара*": "разноцветный",
+    "Тип*": "Платье",
+    "Пол*": "Женский",
+    "Ключевые слова": "платье;платье женское летнее;платье женское;сарафан женский;платье женское праздничное;платье вечернее;платье zara;zara;короткое платье;длинное платье;джинсовое платье;вязаное платье",
+    "Целевая аудитория": "Взрослая",
+    "Сезон": "На любой сезон",
+    "Рост модели на фото": "175 см",
+    "Размер товара на фото": "44",
+    "Коллекция": "Базовая коллекция",
+    "Инструкция по уходу": "Машинная стирка при температуре до 30ºC с коротким циклом отжима.Отбеливание запрещено.Гладить при температуре до 110ºC .Химчистка с тетрахлорэтиленом.Не использовать машинную сушку",
+    "Стиль": "Повседневный;праздничный;вечерний",
+    "Тип упаковки одежды": "Пакет",
+    "Количество в упаковке": "1",
+    "Признак 18+": "Нет"
+}
