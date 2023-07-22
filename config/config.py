@@ -1,11 +1,12 @@
-CATEGORIE = 'https://www2.hm.com/pl_pl/ona/produkty/stroje-kapielowe.html?sort=stock&image-size=small&image=model&offset=0&page-size=500'
+CATEGORIE = 'https://www2.hm.com/pl_pl/ona/produkty/dodatki/torby.html?sort=stock&image-size=small&image=model&offset=0&page-size=500'
 # ?sort=stock&image-size=small&image=model&offset=0&page-size=500
 TIMEOUT = 0.5
 SAVE_PHOTO_PATH = 'photo/'
 HOST = '85.193.92.123'
 SAVE_XLSX_PATH = 'xlsx/'
-TEMPLATE_NAME = 'Купальный костюм.xlsx'
+TEMPLATE_NAME = 'Женская Сумка на плечо.xlsx'
 PARSE_LIMIT = 200
+PARSE_TYPE = 'bags'  # clothes, accessories,shoes
 PRICE_TABLE = {
     "КУРС_USD_ЗЛОТЫ":"4.08",
     "КУРС_USD_RUB":"88.2",

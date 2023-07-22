@@ -16,6 +16,7 @@ from config.config import *
 from config.rich import *
 from config.sizes import *
 from config.table_of_sizes import *
+from config.materials import *
 
 from random import random
 import shutil
@@ -57,13 +58,13 @@ class Parser:
             # options.add_argument('--no-sandbox')
 
             driver = webdriver.Chrome(
-                service=Service(ChromeDriverManager().install()),
+                service=Service('chromedriver.exe'),
                 options=options
             )
             driver.set_window_size(1920, 1080)
-            driver.implicitly_wait(60)
+            driver.implicitly_wait(30)
 
-            self.wait = WebDriverWait(driver, 60)
+            self.wait = WebDriverWait(driver, 30)
 
             return driver
         except Exception as e:
@@ -72,31 +73,21 @@ class Parser:
             print(input('Нажмите ENTER, чтобы закрыть эту программу'))
             sys.exit()
 
-    def parse(self):
+    def get_all_products(self):
         products = []
-        c = 0
-        self.driver.get(CATEGORIE)
-
-        """# scroll page
-        while self.check_exists_by_xpath('//button[@class="button js-load-more "]'):
-            while True:
-                scroll_height = 2000
-                document_height_before = self.driver.execute_script("return document.documentElement.scrollHeight")
-                self.driver.execute_script(f"window.scrollTo(0, {document_height_before + scroll_height});")
-                time.sleep(1.5)
-                document_height_after = self.driver.execute_script("return document.documentElement.scrollHeight")
-                if document_height_after == document_height_before:
-                    self.driver.execute_script(f"window.scrollTo(0, {document_height_before - scroll_height});")
-                    break
-            self.driver.find_element(By.XPATH, '//button[@class="button js-load-more "]').click()
-            time.sleep(TIMEOUT)"""
-
         blocks = self.driver.find_elements(By.CLASS_NAME, 'item-link')
         for block in blocks:
             product_url = block.get_attribute('href')
             if product_url != 'https://www2.hm.com/pl_pl/index.html':
                 products.append(product_url)
         products = self.delete_duplicate(products)
+        return products
+
+    def parse(self):
+        c = 0
+        self.driver.get(CATEGORIE)
+
+        products = self.get_all_products()
         for product_url in products[:PARSE_LIMIT]:
             print(f'{products.index(product_url) + 1} of {len(products[:PARSE_LIMIT])}')
             try:
@@ -125,8 +116,7 @@ class Parser:
 
                 self.wait.until(EC.visibility_of_element_located((By.XPATH, '//h2[@class="fa226d ca21a4"]')))
                 creator = self.translate(self.driver.find_element(By.XPATH, '//h2[@class="fa226d ca21a4"]').text)
-                if creator == 'Инди':
-                    creator = 'Индия'
+                if creator == 'Инди': creator = 'Индия'
                 close = self.driver.find_element(By.XPATH, '//div[@class="f10030"]/button')
                 close.click()
                 time.sleep(TIMEOUT)
@@ -141,24 +131,90 @@ class Parser:
 
             colors = [j.get_attribute('href') for j in self.driver.find_elements(By.XPATH, '//li[@class="list-item"]/a')]
             # if len(colors) >= 8: colors = colors[:7]
-            for j in colors:
-                try:
-                    self.driver.get(j)
-                except Exception:
-                    continue
-                time.sleep(TIMEOUT)
+            if PARSE_TYPE == 'bags':
+                if material != 'Bad material' and material != 'N/A 100%' and material.split(' ')[0].lower() != '':
+                    material = MATERIALS[material.split(' ')[0]]
+                else:
+                    material = ''
+                for j in colors:
+                    try:
+                        self.driver.get(j)
+                    except Exception:
+                        continue
+                    time.sleep(TIMEOUT)
 
-                article_num = search('[0-9]{5,}', self.driver.current_url)[0]
+                    article_num = search('[0-9]{5,}', self.driver.current_url)[0]
 
-                sizes = self.driver.find_elements(By.CLASS_NAME, 'ListGrid-module--item__lHoHF')
+                    self.wait.until(EC.visibility_of_element_located((By.XPATH, '//div[@class="product-detail-main-image-container"]/img')))
+                    main_photo_url = self.driver.find_element(By.XPATH, '//div[@class="product-detail-main-image-container"]/img').get_attribute('src')
+                    main_photo = self.get_photo(main_photo_url, str(article_num) + '_0.jpeg')
 
-                self.wait.until(EC.visibility_of_element_located((By.XPATH, '//div[@class="product-detail-main-image-container"]/img')))
-                main_photo_url = self.driver.find_element(By.XPATH, '//div[@class="product-detail-main-image-container"]/img').get_attribute('src')
-                main_photo = self.get_photo(main_photo_url, str(article_num) + '_0.jpeg')
+                    other_photo_urls = self.driver.find_elements(By.XPATH, '//figure[@class="pdp-secondary-image pdp-image"]/img')
+                    other_photo = ','.join([self.get_photo('https:' + other_photo_urls[i].get_attribute('src'), article_num + '_' + str(i + 1) + '.webp') for i in range(len(other_photo_urls))])
 
-                other_photo_urls = self.driver.find_elements(By.XPATH, '//figure[@class="pdp-secondary-image pdp-image"]/img')
-                other_photo = ','.join([self.get_photo('https:' + other_photo_urls[i].get_attribute('src'), article_num + '_' + str(i + 1) + '.webp') for i in range(len(other_photo_urls))])
+                    # sizes = self.driver.find_elements(By.CLASS_NAME, 'ListGrid-module--item__lHoHF')
+                    # if len(sizes) == 0: sizes = ['']
+                    # for i in sizes:
+                    c += 1
 
+                    color = self.driver.find_element(By.CLASS_NAME, 'product-input-label').text
+
+                    """try:
+                        size = i.text.split('\n')[0]
+                        article = 'H&M_' + article_num + '_' + size
+                    except:"""
+                    # size = ''
+                    article = 'H&M_' + article_num
+
+                    rich = RICH.format(name, description, article_num)
+
+                    COLUMNS['№'] = c
+                    COLUMNS['Артикул*'] = article
+                    COLUMNS['Название товара'] = name
+                    COLUMNS['Цена, руб.*'] = self.get_price(price)
+                    COLUMNS['Ссылка на главное фото*'] = main_photo
+                    COLUMNS['Ссылки на дополнительные фото'] = other_photo
+                    COLUMNS['Название модели (для объединения в одну карточку)*'] = article_num[:-3]
+                    COLUMNS['Цвет товара'] = COLORS[color] if color in COLORS else 'разноцветный'
+                    """if size.isdigit():
+                        COLUMNS['Российский размер*'] = str(int(size) + 6)
+                    else:
+                        try:
+                            COLUMNS['Российский размер*'] = SIZES[size.upper()]
+                        except:
+                            COLUMNS['Российский размер*'] = 'Bad size'  # Если размера нету в таблице размеров
+                    COLUMNS['Размер производителя'] = size"""
+                    COLUMNS['Название цвета'] = self.translate(color)
+                    COLUMNS['Страна-изготовитель'] = creator
+                    COLUMNS['Материал'] = material
+                    COLUMNS['Таблица размеров JSON'] = TABLE_OF_SIZES
+                    COLUMNS['Rich-контент JSON'] = rich
+
+                    self.result.append(COLUMNS.copy())
+            elif PARSE_TYPE == 'clothes':
+                for j in colors:
+                    try:
+                        self.driver.get(j)
+                    except Exception:
+                        continue
+                    time.sleep(TIMEOUT)
+
+                    article_num = search('[0-9]{5,}', self.driver.current_url)[0]
+
+                    self.wait.until(EC.visibility_of_element_located(
+                        (By.XPATH, '//div[@class="product-detail-main-image-container"]/img')))
+                    main_photo_url = self.driver.find_element(By.XPATH,
+                                                              '//div[@class="product-detail-main-image-container"]/img').get_attribute(
+                        'src')
+                    main_photo = self.get_photo(main_photo_url, str(article_num) + '_0.jpeg')
+
+                    other_photo_urls = self.driver.find_elements(By.XPATH,
+                                                                 '//figure[@class="pdp-secondary-image pdp-image"]/img')
+                    other_photo = ','.join([self.get_photo('https:' + other_photo_urls[i].get_attribute('src'),
+                                                           article_num + '_' + str(i + 1) + '.webp') for i in
+                                            range(len(other_photo_urls))])
+
+                    sizes = self.driver.find_elements(By.CLASS_NAME, 'ListGrid-module--item__lHoHF')
                 for i in sizes:
                     c += 1
 
@@ -192,9 +248,7 @@ class Parser:
                     COLUMNS['Таблица размеров JSON'] = TABLE_OF_SIZES
                     COLUMNS['Rich-контент JSON'] = rich
 
-                    tmp = COLUMNS.copy()
-
-                    self.result.append(tmp)
+                    self.result.append(COLUMNS.copy())
 
     def check_exists_by_xpath(self, xpath):
         try:
@@ -285,7 +339,7 @@ class Parser:
             print('--- END PARSING ---')
         except Exception as e:
             self.save(self.result)
-            error = self.driver.current_url + '\n' + traceback.format_exc()
+            error = self.driver.current_url + '\n' + traceback.format_exc() + '\n'
             print(error)
             with open('log.log', 'a') as f:
                 f.write(error)
