@@ -152,18 +152,10 @@ class Parser:
                     other_photo_urls = self.driver.find_elements(By.XPATH, '//figure[@class="pdp-secondary-image pdp-image"]/img')
                     other_photo = ','.join([self.get_photo('https:' + other_photo_urls[i].get_attribute('src'), article_num + '_' + str(i + 1) + '.webp') for i in range(len(other_photo_urls))])
 
-                    # sizes = self.driver.find_elements(By.CLASS_NAME, 'ListGrid-module--item__lHoHF')
-                    # if len(sizes) == 0: sizes = ['']
-                    # for i in sizes:
                     c += 1
 
                     color = self.driver.find_element(By.CLASS_NAME, 'product-input-label').text
 
-                    """try:
-                        size = i.text.split('\n')[0]
-                        article = 'H&M_' + article_num + '_' + size
-                    except:"""
-                    # size = ''
                     article = 'H&M_' + article_num
 
                     rich = RICH.format(name, description, article_num)
@@ -176,14 +168,6 @@ class Parser:
                     COLUMNS['Ссылки на дополнительные фото'] = other_photo
                     COLUMNS['Название модели (для объединения в одну карточку)*'] = article_num[:-3]
                     COLUMNS['Цвет товара'] = COLORS[color] if color in COLORS else 'разноцветный'
-                    """if size.isdigit():
-                        COLUMNS['Российский размер*'] = str(int(size) + 6)
-                    else:
-                        try:
-                            COLUMNS['Российский размер*'] = SIZES[size.upper()]
-                        except:
-                            COLUMNS['Российский размер*'] = 'Bad size'  # Если размера нету в таблице размеров
-                    COLUMNS['Размер производителя'] = size"""
                     COLUMNS['Название цвета'] = self.translate(color)
                     COLUMNS['Страна-изготовитель'] = creator
                     COLUMNS['Материал'] = material
@@ -214,41 +198,109 @@ class Parser:
                                                            article_num + '_' + str(i + 1) + '.webp') for i in
                                             range(len(other_photo_urls))])
 
-                    sizes = self.driver.find_elements(By.CLASS_NAME, 'ListGrid-module--item__lHoHF')
-                for i in sizes:
-                    c += 1
+                    sizes = self.driver.find_elements(By.XPATH, '//hm-size-selector/ul/li')
+                    for i in sizes:
+                        c += 1
 
-                    color = self.driver.find_element(By.CLASS_NAME, 'product-input-label').text
+                        color = self.driver.find_element(By.CLASS_NAME, 'product-input-label').text
 
-                    size = i.text.split('\n')[0]
+                        size = i.text.split('\n')[0]
 
-                    article = 'H&M_' + article_num + '_' + size
+                        article = 'H&M_' + article_num + '_' + size
 
-                    rich = RICH.format(name, description, article_num)
+                        rich = RICH.format(name, description, article_num)
 
-                    COLUMNS['№'] = c
-                    COLUMNS['Артикул*'] = article
-                    COLUMNS['Название товара'] = name
-                    COLUMNS['Цена, руб.*'] = self.get_price(price)
-                    COLUMNS['Ссылка на главное фото*'] = main_photo
-                    COLUMNS['Ссылки на дополнительные фото'] = other_photo
-                    COLUMNS['Объединить на одной карточке*'] = article_num[:-3]
-                    COLUMNS['Цвет товара*'] = COLORS[color] if color in COLORS else 'разноцветный'
-                    if size.isdigit():
-                        COLUMNS['Российский размер*'] = str(int(size) + 6)
-                    else:
+                        COLUMNS['№'] = c
+                        COLUMNS['Артикул*'] = article
+                        COLUMNS['Название товара'] = name
+                        COLUMNS['Цена, руб.*'] = self.get_price(price)
+                        COLUMNS['Ссылка на главное фото*'] = main_photo
+                        COLUMNS['Ссылки на дополнительные фото'] = other_photo
+                        COLUMNS['Объединить на одной карточке*'] = article_num[:-3]
+                        COLUMNS['Цвет товара*'] = COLORS[color] if color in COLORS else 'разноцветный'
+                        if size.isdigit():
+                            COLUMNS['Российский размер*'] = str(int(size) + 6)
+                        else:
+                            try:
+                                COLUMNS['Российский размер*'] = SIZES[size.upper()]
+                            except:
+                                COLUMNS['Российский размер*'] = 'Bad size'  # Если размера нету в таблице размеров
+                        COLUMNS['Размер производителя'] = size
+                        COLUMNS['Название цвета'] = self.translate(color)
+                        COLUMNS['Страна-изготовитель'] = creator
+                        COLUMNS['Состав материала'] = self.translate(material)
+                        COLUMNS['Таблица размеров JSON'] = TABLE_OF_SIZES
+                        COLUMNS['Rich-контент JSON'] = rich
+
+                        self.result.append(COLUMNS.copy())
+            elif PARSE_TYPE == 'shoes':
+                material = self.driver.find_element(By.XPATH, '//ul[@class="f94b22"]').text
+                main_material, internal_material, sole_material = '', '', ''
+                for i in material.split('\n'):
+                    key, value = i.split(':')
+                    if key == 'Strona wierzchnia':
+                        main_material = MATERIALS[value.split(' ')[0]]
+                    elif key == 'Podszewka':
+                        internal_material = MATERIALS[value.split(' ')[0]]
+                    elif key == 'Podeszwa zewnętrzna':
+                        sole_material = MATERIALS[value.split(' ')[0]]
+                for j in colors:
+                    try:
+                        self.driver.get(j)
+                    except Exception:
+                        continue
+                    time.sleep(TIMEOUT)
+
+                    article_num = search('[0-9]{5,}', self.driver.current_url)[0]
+
+                    self.wait.until(EC.visibility_of_element_located(
+                        (By.XPATH, '//div[@class="product-detail-main-image-container"]/img')))
+                    main_photo_url = self.driver.find_element(By.XPATH,
+                                                              '//div[@class="product-detail-main-image-container"]/img').get_attribute(
+                        'src')
+                    main_photo = self.get_photo(main_photo_url, str(article_num) + '_0.jpeg')
+
+                    other_photo_urls = self.driver.find_elements(By.XPATH,
+                                                                 '//figure[@class="pdp-secondary-image pdp-image"]/img')
+                    other_photo = ','.join([self.get_photo('https:' + other_photo_urls[i].get_attribute('src'),
+                                                           article_num + '_' + str(i + 1) + '.webp') for i in
+                                            range(len(other_photo_urls))])
+
+                    sizes = self.driver.find_elements(By.XPATH, '//hm-size-selector/ul/li')
+                    for i in sizes:
+                        c += 1
+
+                        color = self.driver.find_element(By.CLASS_NAME, 'product-input-label').text
+
+                        size = i.text.split('\n')[0]
+
+                        article = 'H&M_' + article_num + '_' + size
+
+                        rich = RICH.format(name, description, article_num)
+
+                        COLUMNS['№'] = c
+                        COLUMNS['Артикул*'] = article
+                        COLUMNS['Название товара'] = name
+                        COLUMNS['Цена, руб.*'] = self.get_price(price)
+                        COLUMNS['Ссылка на главное фото*'] = main_photo
+                        COLUMNS['Ссылки на дополнительные фото'] = other_photo
+                        COLUMNS['Объединить на одной карточке*'] = article_num[:-3]
+                        COLUMNS['Цвет товара*'] = COLORS[color] if color in COLORS else 'разноцветный'
                         try:
-                            COLUMNS['Российский размер*'] = SIZES[size.upper()]
+                            COLUMNS['Российский размер (обуви)*'] = SIZES[size.upper()]
                         except:
-                            COLUMNS['Российский размер*'] = 'Bad size'  # Если размера нету в таблице размеров
-                    COLUMNS['Размер производителя'] = size
-                    COLUMNS['Название цвета'] = self.translate(color)
-                    COLUMNS['Страна-изготовитель'] = creator
-                    COLUMNS['Состав материала'] = self.translate(material)
-                    COLUMNS['Таблица размеров JSON'] = TABLE_OF_SIZES
-                    COLUMNS['Rich-контент JSON'] = rich
+                            COLUMNS['Российский размер (обуви)*'] = 'Bad size'  # Если размера нету в таблице размеров
+                        COLUMNS['Размер производителя'] = size
+                        COLUMNS['Название цвета'] = self.translate(color)
+                        COLUMNS['Страна-изготовитель'] = creator
+                        COLUMNS['Материал'] = main_material
+                        COLUMNS['Внутренний материал'] = internal_material
+                        COLUMNS['Материал подошвы'] = sole_material
+                        COLUMNS['Таблица размеров JSON'] = TABLE_OF_SIZES
+                        COLUMNS['Rich-контент JSON'] = rich
 
-                    self.result.append(COLUMNS.copy())
+                        self.result.append(COLUMNS.copy())
+
 
     def check_exists_by_xpath(self, xpath):
         try:
@@ -343,7 +395,6 @@ class Parser:
             print(error)
             with open('log.log', 'a') as f:
                 f.write(error)
-            logging.error("ERROR")
         finally:
             self.driver.close()
             self.driver.quit()
