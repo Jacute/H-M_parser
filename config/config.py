@@ -1,23 +1,19 @@
-CATEGORIE = 'https://www2.hm.com/pl_pl/ona/produkty/buty.html?sort=stock&footwearStyles=Sanda%C5%82y&image-size=small&image=model&offset=0&page-size=500'
+CATEGORIE = 'толстовки для девочек'
 # ?sort=stock&image-size=small&image=model&offset=0&page-size=500
 TIMEOUT = 0.5
 SAVE_PHOTO_PATH = 'photo/'
 HOST = '85.193.92.123'
 SAVE_XLSX_PATH = 'xlsx/'
-TEMPLATE_NAME = 'Женские Босоножки.xlsx'
-PARSE_LIMIT = 300
-PARSE_TYPE = 'shoes'  # clothes, accessories, shoes
+PARSE_LIMIT = 1
 PRICE_TABLE = {
-    "КУРС_USD_ЗЛОТЫ":"4.08",
-    "КУРС_USD_RUB":"88.2",
-    "КУРС_БЕЛ.РУБ_РУБ":"29.28",
-    "КУРС_EUR_БЕЛ.РУБ":"3.35",
+    "КУРС_USD_ЗЛОТЫ":"4.05",
+    "КУРС_USD_RUB":"92.30",
+    "КУРС_БЕЛ.РУБ_РУБ":"30.84",
+    "КУРС_EUR_БЕЛ.РУБ":"3.38",
 
-    "ЦЕНА_ДОСТАВКИ_В_КАТЕГОРИИ":"4",
     "КОЭФ_КОНВЕРТАЦИИ":"1.025",
     "СРЕД_ЦЕН_ДОСТАВКИ":"300",
-    "НАЦЕНКА":"1.47",
-    "ПРОЦЕНТЫ_ОЗОН":"0.18",
+    "НАЦЕНКА":"1.52",
     "ПРОЦЕНТЫ_НАЛОГ":"0.06",
     "ПРОЦЕНТЫ_ЭКВАЙРИНГ":"0.0115"
 }

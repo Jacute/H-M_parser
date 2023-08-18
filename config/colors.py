@@ -120,4 +120,6 @@ COLORS = {
     "Szarobeżowy melanż":"бежевый",
     "Jasnopomarańczowy":"оранжевый",
     "Fiołkowy melanż":"бежевый;фиолетовый"
+
+
 }
