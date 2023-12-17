@@ -49,5 +49,7 @@ MATERIALS = {
     "Zamsz":"Замша",
     "Modal":"Вискоза",
     "Szkło":"Стекло",
-    "Aluminium":"Алюминий"
+    "Aluminium":"Алюминий",
+    "Etylen/octan":"",
+    "Lyocell":"Лиоцелл"
 }

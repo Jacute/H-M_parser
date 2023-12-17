@@ -55,15 +55,15 @@ class Parser:
 
             # options.add_argument('--disable-dev-shm-usage')
             # options.add_argument('--no-sandbox')
-
+            service = Service(os.path.abspath("chromedriver") if os.name == 'posix' else os.path.abspath("chromedriver.exe"))
             driver = webdriver.Chrome(
-                service=Service('chromedriver.exe'),
+                service=service,
                 options=options
             )
             driver.set_window_size(1920, 1080)
-            driver.implicitly_wait(30)
+            driver.implicitly_wait(5)
 
-            self.wait = WebDriverWait(driver, 30)
+            self.wait = WebDriverWait(driver, 5)
 
             return driver
         except Exception as e:
@@ -85,6 +85,9 @@ class Parser:
     def parse(self):
         c = 0
         self.driver.get(self.CATEGORIE_URL)
+        time.sleep(TIMEOUT)
+
+        self.driver.find_element(By.ID, 'onetrust-accept-btn-handler').click()
 
         products = self.get_all_products()
         for product_url in products[:PARSE_LIMIT]:
@@ -94,27 +97,29 @@ class Parser:
             except:
                 continue
 
-            self.driver.execute_script("window.scrollTo(0, 1000)")
+            self.driver.execute_script("window.scrollTo(0, 1100)")
+            time.sleep(TIMEOUT)
 
-            description_btn = self.driver.find_element(By.ID, 'toggle-descriptionAccordion')
+            description_btn = self.driver.find_element(By.XPATH, '//button[@id="toggle-descriptionAccordion"]')
             description_btn.click()
-            description = self.translate(self.driver.find_element(By.CLASS_NAME, 'd1cd7b.b475fe.e2b79d').text).strip()
+            time.sleep(TIMEOUT)
+            description = self.translate(self.driver.find_element(By.CSS_SELECTOR, '.d1cd7b.b475fe.e2b79d').text).strip()
 
             try:
-                material_btn = self.driver.find_element(By.ID, 'toggle-materialsAndSuppliersAccordion')
+                material_btn = self.driver.find_element(By.XPATH, '//button[@id="toggle-materialsAndSuppliersAccordion"]')
                 material_btn.click()
-                self.wait.until(EC.visibility_of_element_located((By.CLASS_NAME, 'd1cd7b.a09145.efef57')))
-                material = self.driver.find_element(By.CLASS_NAME, 'd1cd7b.a09145.efef57').text
+                time.sleep(TIMEOUT)
+
+                material = self.driver.find_element(By.CSS_SELECTOR, '.d1cd7b.a09145.efef57').text
             except Exception:
                 material = 'Bad material'
 
             try:
-                creator_btn = self.driver.find_element(By.XPATH, '//button[@class="f05bd4 cf896c c63d19 aaa2a2 d28f9c"]')
+                creator_btn = self.driver.find_element(By.CSS_SELECTOR, '.f05bd4.cf896c.c63d19.aaa2a2.d28f9c')
                 creator_btn.click()
                 time.sleep(TIMEOUT)
 
-                self.wait.until(EC.visibility_of_element_located((By.XPATH, '//h2[@class="fa226d ca21a4"]')))
-                creator = self.translate(self.driver.find_element(By.XPATH, '//h2[@class="fa226d ca21a4"]').text)
+                creator = self.translate(self.driver.find_element(By.XPATH, '//div[@class="a6b059"]/h3').text)
                 if creator == 'Инди': creator = 'Индия'
                 close = self.driver.find_element(By.XPATH, '//div[@class="f10030"]/button')
                 close.click()
@@ -124,12 +129,16 @@ class Parser:
 
             name = self.translate(self.driver.find_element(By.ID, 'js-product-name').text).strip()
 
-            price = re.findall(r'\d{1,},\d{1,}', self.driver.find_element(By.ID, 'product-price').text)
-            price = max(price).replace(',', '.')
+            price = self.driver.find_element(By.ID, 'product-price').text
+            if 'Cena Klubowicza' in price:
+                price = price[:price.find('Cena Klubowicza')]
+            price = re.findall(r'[0-9 ]+,\d+', price)[0].replace(',', '.').replace(' ', '').strip()
+            if price == []: price = re.findall(r'\d+', price)[0].replace(',', '.').replace(' ', '').strip()
+            price = self.get_hm_price(price)
 
             colors = [j.get_attribute('href') for j in self.driver.find_elements(By.XPATH, '//li[@class="list-item"]/a')]
             # if len(colors) >= 8: colors = colors[:7]
-            if PARSE_TYPE == 'bags':
+            if self.PARSE_TYPE == 'bags':
                 if material != 'Bad material' and material != 'N/A 100%' and material.split(' ')[0].lower() != '':
                     material = MATERIALS[material.split(' ')[0]]
                 else:
@@ -148,7 +157,7 @@ class Parser:
                     main_photo = self.get_photo(main_photo_url, str(article_num) + '_0.jpeg')
 
                     other_photo_urls = self.driver.find_elements(By.XPATH, '//figure[@class="pdp-secondary-image pdp-image"]/img')
-                    other_photo = ','.join([self.get_photo('https:' + other_photo_urls[i].get_attribute('src'), article_num + '_' + str(i + 1) + '.webp') for i in range(len(other_photo_urls))])
+                    other_photo = ','.join([self.get_photo(other_photo_urls[i].get_attribute('src'), article_num + '_' + str(i + 1) + '.webp') for i in range(len(other_photo_urls))])
 
                     c += 1
 
@@ -162,7 +171,7 @@ class Parser:
                     self.COLUMNS['Артикул*'] = article
                     self.COLUMNS['Название товара'] = name
                     try:
-                        self.COLUMNS['Цена, руб.*'] = self.get_price(price)
+                        self.COLUMNS['Цена, руб.*'] = price
                     except:
                         self.COLUMNS['Цена, руб.*'] = 'Bad price'
                     self.COLUMNS['Ссылка на главное фото*'] = main_photo
@@ -176,9 +185,11 @@ class Parser:
                     self.COLUMNS['Rich-контент JSON'] = rich
 
                     self.result.append(self.COLUMNS.copy())
-            elif PARSE_TYPE == 'clothes':
+            elif self.PARSE_TYPE == 'clothes':
                 main_material = re.split(r' \d{1,3}%', material)[0]
                 for j in colors:
+                    if self.driver.current_url == 'https://www2.hm.com/pl_pl/index.html':
+                        continue
                     try:
                         self.driver.get(j)
                     except Exception:
@@ -196,7 +207,7 @@ class Parser:
 
                     other_photo_urls = self.driver.find_elements(By.XPATH,
                                                                  '//figure[@class="pdp-secondary-image pdp-image"]/img')
-                    other_photo = ','.join([self.get_photo('https:' + other_photo_urls[i].get_attribute('src'),
+                    other_photo = ','.join([self.get_photo(other_photo_urls[i].get_attribute('src'),
                                                            article_num + '_' + str(i + 1) + '.webp') for i in
                                             range(len(other_photo_urls))])
 
@@ -216,7 +227,7 @@ class Parser:
                         self.COLUMNS['Артикул*'] = article
                         self.COLUMNS['Название товара'] = name
                         try:
-                            self.COLUMNS['Цена, руб.*'] = self.get_price(price)
+                            self.COLUMNS['Цена, руб.*'] = price
                         except:
                             self.COLUMNS['Цена, руб.*'] = 'Bad price'
                         self.COLUMNS['Ссылка на главное фото*'] = main_photo
@@ -239,7 +250,7 @@ class Parser:
                         self.COLUMNS['Rich-контент JSON'] = rich
 
                         self.result.append(self.COLUMNS.copy())
-            elif PARSE_TYPE == 'shoes':
+            elif self.PARSE_TYPE == 'shoes':
                 material = self.driver.find_element(By.XPATH, '//ul[@class="f94b22"]').text
                 main_material, internal_material, sole_material = '', '', ''
                 for i in material.split('\n'):
@@ -268,7 +279,8 @@ class Parser:
 
                     other_photo_urls = self.driver.find_elements(By.XPATH,
                                                                  '//figure[@class="pdp-secondary-image pdp-image"]/img')
-                    other_photo = ','.join([self.get_photo('https:' + other_photo_urls[i].get_attribute('src'),
+                    other_photo = ','.join([self.get_photo(
+                        other_photo_urls[i].get_attribute('src'),
                                                            article_num + '_' + str(i + 1) + '.webp') for i in
                                             range(len(other_photo_urls))])
 
@@ -288,7 +300,7 @@ class Parser:
                         self.COLUMNS['Артикул*'] = article
                         self.COLUMNS['Название товара'] = name
                         try:
-                            self.COLUMNS['Цена, руб.*'] = self.get_price(price)
+                            self.COLUMNS['Цена, руб.*'] = price
                         except:
                             self.COLUMNS['Цена, руб.*'] = 'Bad price'
                         self.COLUMNS['Ссылка на главное фото*'] = main_photo
@@ -349,28 +361,21 @@ class Parser:
     def gPriceDict(self, key):
         return float(PRICE_TABLE[key])
 
-    def get_price(self, pln_price):
+    def get_hm_price(self, pln_price):
         cost_price = ((float(pln_price) / self.gPriceDict("КУРС_USD_ЗЛОТЫ")) * self.gPriceDict("КОЭФ_КОНВЕРТАЦИИ") * self.gPriceDict(
             'КУРС_USD_RUB')) + (self.DELIVERY_PRICE * self.gPriceDict('КУРС_БЕЛ.РУБ_РУБ') * self.gPriceDict(
             'КУРС_EUR_БЕЛ.РУБ'))
-        final_price = ((cost_price + self.gPriceDict('СРЕД_ЦЕН_ДОСТАВКИ')) * self.gPriceDict('НАЦЕНКА')) / (
-                    1 - self.OZON_PRICE_MARKUP - self.gPriceDict('ПРОЦЕНТЫ_НАЛОГ') - self.gPriceDict('ПРОЦЕНТЫ_ЭКВАЙРИНГ'))
+        final_price = (cost_price + self.gPriceDict('СРЕД_ЦЕН_ДОСТАВКИ')) / (
+                    1 - self.gPriceDict('НАЦЕНКА') - self.OZON_PRICE_MARKUP - self.gPriceDict('ПРОЦЕНТЫ_НАЛОГ') - self.gPriceDict('ПРОЦЕНТЫ_ЭКВАЙРИНГ'))
 
-        if final_price > 20000:
-            final_price = (final_price // 1000 + 1) * 1000 - 1
-        elif final_price > 10000:
-            if final_price % 1000 >= 500:
-                final_price = (final_price // 1000) * 1000 + 999
-            else:
-                final_price = (final_price // 1000) * 1000 + 499
-        else:
-            final_price = (final_price // 100 + 1) * 100 - 1
+        final_price = (final_price // 100 + 1) * 100 - 1
         return final_price
 
     def load_settings(self):
         with open('settings.json', 'r', encoding='utf-8') as f:
             self.settings = json.load(f)
         self.CATEGORIE_URL = self.settings[CATEGORIE]['url']
+        self.PARSE_TYPE = self.settings[CATEGORIE]['type_pars']
         self.DELIVERY_PRICE = float(self.settings[CATEGORIE]["ЦЕНА_ДОСТАВКИ_В_КАТЕГОРИИ"])
         self.OZON_PRICE_MARKUP = float(self.settings[CATEGORIE]["ПРОЦЕНТЫ_ОЗОН"])
         self.COLUMNS = self.load_module('columns').COLUMNS
@@ -389,7 +394,7 @@ class Parser:
 
     def save(self, result):
         wb = load_workbook(filename=f'{self.settings[CATEGORIE]["folder_path"]}/example.xlsx')
-        ws = wb['Шаблон для поставщика']
+        ws = wb['Шаблон']
         alphabet = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
         cols = []
         for col in alphabet:

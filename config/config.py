@@ -1,10 +1,10 @@
-CATEGORIE = 'толстовки для девочек'
+CATEGORIE = 'леггинсы'
 # ?sort=stock&image-size=small&image=model&offset=0&page-size=500
 TIMEOUT = 0.5
 SAVE_PHOTO_PATH = 'photo/'
 HOST = '85.193.92.123'
 SAVE_XLSX_PATH = 'xlsx/'
-PARSE_LIMIT = 1
+PARSE_LIMIT = 150
 PRICE_TABLE = {
     "КУРС_USD_ЗЛОТЫ":"4.05",
     "КУРС_USD_RUB":"92.30",

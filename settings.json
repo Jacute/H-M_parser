@@ -6,6 +6,22 @@
         "folder_path":"/home/jacute/PycharmProjects/H&M_parser/profiles/толстовки для девочек",
         "ЦЕНА_ДОСТАВКИ_В_КАТЕГОРИИ":"2",
         "ПРОЦЕНТЫ_ОЗОН":"0.18"
+    },
+
+    "shoes": {
+        "url": "https://www2.hm.com/pl_pl/on/produkty/polbuty.html?sort=newProduct&footwearStyles=Buty+sportowe&image-size=small&image=stillLife&offset=0&page-size=500",
+        "type_pars": "shoes",
+        "folder_path": "/home/jacute/PycharmProjects/H&M_parser/profiles/shoes",
+        "ЦЕНА_ДОСТАВКИ_В_КАТЕГОРИИ":"2",
+        "ПРОЦЕНТЫ_ОЗОН":"0.18"
+    },
+
+    "леггинсы": {
+        "url": "https://www2.hm.com/pl_pl/ona/produkty/spodnie/legginsy.html?page-size=500",
+        "type_pars": "clothes",
+        "folder_path": "/home/jacute/PycharmProjects/H&M_parser/profiles/леггинсы",
+        "ЦЕНА_ДОСТАВКИ_В_КАТЕГОРИИ":"2",
+        "ПРОЦЕНТЫ_ОЗОН":"0.18"
     }
 
 }
