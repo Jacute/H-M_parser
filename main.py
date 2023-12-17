@@ -6,7 +6,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
 from googletrans import Translator
@@ -31,6 +31,8 @@ import argparse
 class Parser:
     def __init__(self):
         self.result = []
+        self.count = 0
+        
         parser = argparse.ArgumentParser(description='Process some integers.')
         parser.add_argument('--headless', action='store_true', help='headless')
         args = parser.parse_args()
@@ -82,20 +84,9 @@ class Parser:
         products = self.delete_duplicate(products)
         return products
 
-    def parse(self):
-        c = 0
-        self.driver.get(self.CATEGORIE_URL)
-        time.sleep(TIMEOUT)
-
-        self.driver.find_element(By.ID, 'onetrust-accept-btn-handler').click()
-
-        products = self.get_all_products()
-        for product_url in products[:PARSE_LIMIT]:
-            print(f'{products.index(product_url) + 1} of {len(products[:PARSE_LIMIT])}')
-            try:
-                self.driver.get(product_url)
-            except:
-                continue
+    def parseOne(self, product_url):
+        try:
+            self.driver.get(product_url)
 
             self.driver.execute_script("window.scrollTo(0, 1100)")
             time.sleep(TIMEOUT)
@@ -152,14 +143,20 @@ class Parser:
 
                     article_num = re.search('[0-9]{5,}', self.driver.current_url)[0]
 
-                    self.wait.until(EC.visibility_of_element_located((By.XPATH, '//div[@class="product-detail-main-image-container"]/img')))
-                    main_photo_url = self.driver.find_element(By.XPATH, '//div[@class="product-detail-main-image-container"]/img').get_attribute('src')
+                    self.wait.until(EC.visibility_of_element_located(
+                        (By.XPATH, '//div[@class="product-detail-main-image-container"]/img')))
+                    main_photo_url = self.driver.find_element(By.XPATH,
+                                                              '//div[@class="product-detail-main-image-container"]/img').get_attribute(
+                        'src')
                     main_photo = self.get_photo(main_photo_url, str(article_num) + '_0.jpeg')
 
-                    other_photo_urls = self.driver.find_elements(By.XPATH, '//figure[@class="pdp-secondary-image pdp-image"]/img')
-                    other_photo = ','.join([self.get_photo(other_photo_urls[i].get_attribute('src'), article_num + '_' + str(i + 1) + '.webp') for i in range(len(other_photo_urls))])
+                    other_photo_urls = self.driver.find_elements(By.XPATH,
+                                                                 '//figure[@class="pdp-secondary-image pdp-image"]/img')
+                    other_photo = ','.join(
+                        [self.get_photo(other_photo_urls[i].get_attribute('src'), article_num + '_' + str(i + 1) + '.webp')
+                         for i in range(len(other_photo_urls))])
 
-                    c += 1
+                    self.count += 1
 
                     color = self.driver.find_element(By.CLASS_NAME, 'product-input-label').text
 
@@ -167,7 +164,7 @@ class Parser:
 
                     rich = self.RICH.format(name, description, article_num)
 
-                    self.COLUMNS['№'] = c
+                    self.COLUMNS['№'] = self.count
                     self.COLUMNS['Артикул*'] = article
                     self.COLUMNS['Название товара'] = name
                     try:
@@ -213,7 +210,7 @@ class Parser:
 
                     sizes = self.driver.find_elements(By.XPATH, '//hm-size-selector/ul/li')
                     for i in sizes:
-                        c += 1
+                        self.count += 1
 
                         color = self.driver.find_element(By.CLASS_NAME, 'product-input-label').text
 
@@ -223,7 +220,7 @@ class Parser:
 
                         rich = self.RICH.format(name, description, article_num)
 
-                        self.COLUMNS['№'] = c
+                        self.COLUMNS['№'] = self.count
                         self.COLUMNS['Артикул*'] = article
                         self.COLUMNS['Название товара'] = name
                         try:
@@ -281,12 +278,12 @@ class Parser:
                                                                  '//figure[@class="pdp-secondary-image pdp-image"]/img')
                     other_photo = ','.join([self.get_photo(
                         other_photo_urls[i].get_attribute('src'),
-                                                           article_num + '_' + str(i + 1) + '.webp') for i in
-                                            range(len(other_photo_urls))])
+                        article_num + '_' + str(i + 1) + '.webp') for i in
+                        range(len(other_photo_urls))])
 
                     sizes = self.driver.find_elements(By.XPATH, '//hm-size-selector/ul/li')
                     for i in sizes:
-                        c += 1
+                        self.count += 1
 
                         color = self.driver.find_element(By.CLASS_NAME, 'product-input-label').text
 
@@ -296,7 +293,7 @@ class Parser:
 
                         rich = self.RICH.format(name, description, article_num)
 
-                        self.COLUMNS['№'] = c
+                        self.COLUMNS['№'] = self.count
                         self.COLUMNS['Артикул*'] = article
                         self.COLUMNS['Название товара'] = name
                         try:
@@ -321,6 +318,23 @@ class Parser:
                         self.COLUMNS['Rich-контент JSON'] = rich
 
                         self.result.append(self.COLUMNS.copy())
+        except TimeoutException:
+            pass
+        except Exception:
+            error = self.driver.current_url + '\n' + traceback.format_exc() + '\n'
+            with open('log.log', 'a') as f:
+                f.write(error)
+
+    def parse(self):
+        self.driver.get(self.CATEGORIE_URL)
+        time.sleep(TIMEOUT)
+
+        self.driver.find_element(By.ID, 'onetrust-accept-btn-handler').click()
+
+        products = self.get_all_products()
+        for product_url in products[:PARSE_LIMIT]:
+            print(f'{products.index(product_url) + 1} of {len(products[:PARSE_LIMIT])}')
+            self.parseOne(product_url)
 
     def check_exists_by_xpath(self, xpath):
         try:
