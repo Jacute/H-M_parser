@@ -35,8 +35,8 @@ class Parser:
         
         parser = argparse.ArgumentParser(description='Process some integers.')
         parser.add_argument('--headless', action='store_true', help='headless')
-        args = parser.parse_args()
-        if args.headless:
+        self.args = parser.parse_args()
+        if self.args.headless:
             self.driver = self.get_driver(True)
         else:
             self.driver = self.get_driver(False)
@@ -85,82 +85,137 @@ class Parser:
         return products
 
     def parseOne(self, product_url):
+        self.driver.get(product_url)
+
+        self.driver.execute_script("window.scrollTo(0, 1100)")
+        time.sleep(TIMEOUT)
+
+        description_btn = self.driver.find_element(By.XPATH, '//button[@id="toggle-descriptionAccordion"]')
+        description_btn.click()
+        time.sleep(TIMEOUT)
+        description = self.translate(self.driver.find_element(By.CSS_SELECTOR, '.d1cd7b.b475fe.e2b79d').text).strip()
+
         try:
-            self.driver.get(product_url)
-
-            self.driver.execute_script("window.scrollTo(0, 1100)")
+            material_btn = self.driver.find_element(By.XPATH, '//button[@id="toggle-materialsAndSuppliersAccordion"]')
+            material_btn.click()
             time.sleep(TIMEOUT)
 
-            description_btn = self.driver.find_element(By.XPATH, '//button[@id="toggle-descriptionAccordion"]')
-            description_btn.click()
+            material = self.driver.find_element(By.CSS_SELECTOR, '.d1cd7b.a09145.efef57').text
+        except Exception:
+            material = 'Bad material'
+
+        try:
+            creator_btn = self.driver.find_element(By.CSS_SELECTOR, '.f05bd4.cf896c.c63d19.aaa2a2.d28f9c')
+            creator_btn.click()
             time.sleep(TIMEOUT)
-            description = self.translate(self.driver.find_element(By.CSS_SELECTOR, '.d1cd7b.b475fe.e2b79d').text).strip()
 
-            try:
-                material_btn = self.driver.find_element(By.XPATH, '//button[@id="toggle-materialsAndSuppliersAccordion"]')
-                material_btn.click()
+            creator = self.translate(self.driver.find_element(By.XPATH, '//div[@class="a6b059"]/h3').text)
+            if creator == 'Инди': creator = 'Индия'
+            close = self.driver.find_element(By.XPATH, '//div[@class="f10030"]/button')
+            close.click()
+            time.sleep(TIMEOUT)
+        except:
+            creator = 'Bad creator'
+
+        name = self.translate(self.driver.find_element(By.ID, 'js-product-name').text).strip()
+
+        price = self.driver.find_element(By.ID, 'product-price').text
+        if 'Cena Klubowicza' in price:
+            price = price[:price.find('Cena Klubowicza')]
+        price = re.findall(r'[0-9 ]+,\d+', price)[0].replace(',', '.').replace(' ', '').strip()
+        if price == []: price = re.findall(r'\d+', price)[0].replace(',', '.').replace(' ', '').strip()
+        price = self.get_hm_price(price)
+
+        colors = [j.get_attribute('href') for j in self.driver.find_elements(By.XPATH, '//li[@class="list-item"]/a')]
+        # if len(colors) >= 8: colors = colors[:7]
+        if self.PARSE_TYPE == 'bags':
+            if material != 'Bad material' and material != 'N/A 100%' and material.split(' ')[0].lower() != '':
+                material = MATERIALS[material.split(' ')[0]]
+            else:
+                material = ''
+            for j in colors:
+                try:
+                    self.driver.get(j)
+                except Exception:
+                    continue
                 time.sleep(TIMEOUT)
 
-                material = self.driver.find_element(By.CSS_SELECTOR, '.d1cd7b.a09145.efef57').text
-            except Exception:
-                material = 'Bad material'
+                article_num = re.search('[0-9]{5,}', self.driver.current_url)[0]
 
-            try:
-                creator_btn = self.driver.find_element(By.CSS_SELECTOR, '.f05bd4.cf896c.c63d19.aaa2a2.d28f9c')
-                creator_btn.click()
+                self.wait.until(EC.visibility_of_element_located(
+                    (By.XPATH, '//div[@class="product-detail-main-image-container"]/img')))
+                main_photo_url = self.driver.find_element(By.XPATH,
+                                                            '//div[@class="product-detail-main-image-container"]/img').get_attribute(
+                    'src')
+                main_photo = self.get_photo(main_photo_url, str(article_num) + '_0.jpeg')
+
+                other_photo_urls = self.driver.find_elements(By.XPATH,
+                                                                '//figure[@class="pdp-secondary-image pdp-image"]/img')
+                other_photo = ','.join(
+                    [self.get_photo(other_photo_urls[i].get_attribute('src'), article_num + '_' + str(i + 1) + '.webp')
+                        for i in range(len(other_photo_urls))])
+
+                self.count += 1
+
+                color = self.driver.find_element(By.CLASS_NAME, 'product-input-label').text
+
+                article = 'H&M_' + article_num
+
+                rich = self.RICH.format(name, description, article_num)
+
+                self.COLUMNS['№'] = self.count
+                self.COLUMNS['Артикул*'] = article
+                self.COLUMNS['Название товара'] = name
+                try:
+                    self.COLUMNS['Цена, руб.*'] = price
+                except:
+                    self.COLUMNS['Цена, руб.*'] = 'Bad price'
+                self.COLUMNS['Ссылка на главное фото*'] = main_photo
+                self.COLUMNS['Ссылки на дополнительные фото'] = other_photo
+                self.COLUMNS['Название модели (для объединения в одну карточку)*'] = article_num[:-3]
+                self.COLUMNS['Цвет товара'] = COLORS[color] if color in COLORS else 'разноцветный'
+                self.COLUMNS['Название цвета'] = self.translate(color)
+                self.COLUMNS['Страна-изготовитель'] = creator
+                self.COLUMNS['Материал'] = material
+                self.COLUMNS['Таблица размеров JSON'] = self.TABLE_OF_SIZES
+                self.COLUMNS['Rich-контент JSON'] = rich
+
+                self.result.append(self.COLUMNS.copy())
+        elif self.PARSE_TYPE == 'clothes':
+            main_material = re.split(r' \d{1,3}%', material)[0]
+            for j in colors:
+                if self.driver.current_url == 'https://www2.hm.com/pl_pl/index.html':
+                    continue
+                try:
+                    self.driver.get(j)
+                except Exception:
+                    continue
                 time.sleep(TIMEOUT)
 
-                creator = self.translate(self.driver.find_element(By.XPATH, '//div[@class="a6b059"]/h3').text)
-                if creator == 'Инди': creator = 'Индия'
-                close = self.driver.find_element(By.XPATH, '//div[@class="f10030"]/button')
-                close.click()
-                time.sleep(TIMEOUT)
-            except:
-                creator = 'Bad creator'
+                article_num = re.search('[0-9]{5,}', self.driver.current_url)[0]
 
-            name = self.translate(self.driver.find_element(By.ID, 'js-product-name').text).strip()
+                self.wait.until(EC.visibility_of_element_located(
+                    (By.XPATH, '//div[@class="product-detail-main-image-container"]/img')))
+                main_photo_url = self.driver.find_element(By.XPATH,
+                                                            '//div[@class="product-detail-main-image-container"]/img').get_attribute(
+                    'src')
+                main_photo = self.get_photo(main_photo_url, str(article_num) + '_0.jpeg')
 
-            price = self.driver.find_element(By.ID, 'product-price').text
-            if 'Cena Klubowicza' in price:
-                price = price[:price.find('Cena Klubowicza')]
-            price = re.findall(r'[0-9 ]+,\d+', price)[0].replace(',', '.').replace(' ', '').strip()
-            if price == []: price = re.findall(r'\d+', price)[0].replace(',', '.').replace(' ', '').strip()
-            price = self.get_hm_price(price)
+                other_photo_urls = self.driver.find_elements(By.XPATH,
+                                                                '//figure[@class="pdp-secondary-image pdp-image"]/img')
+                other_photo = ','.join([self.get_photo(other_photo_urls[i].get_attribute('src'),
+                                                        article_num + '_' + str(i + 1) + '.webp') for i in
+                                        range(len(other_photo_urls))])
 
-            colors = [j.get_attribute('href') for j in self.driver.find_elements(By.XPATH, '//li[@class="list-item"]/a')]
-            # if len(colors) >= 8: colors = colors[:7]
-            if self.PARSE_TYPE == 'bags':
-                if material != 'Bad material' and material != 'N/A 100%' and material.split(' ')[0].lower() != '':
-                    material = MATERIALS[material.split(' ')[0]]
-                else:
-                    material = ''
-                for j in colors:
-                    try:
-                        self.driver.get(j)
-                    except Exception:
-                        continue
-                    time.sleep(TIMEOUT)
-
-                    article_num = re.search('[0-9]{5,}', self.driver.current_url)[0]
-
-                    self.wait.until(EC.visibility_of_element_located(
-                        (By.XPATH, '//div[@class="product-detail-main-image-container"]/img')))
-                    main_photo_url = self.driver.find_element(By.XPATH,
-                                                              '//div[@class="product-detail-main-image-container"]/img').get_attribute(
-                        'src')
-                    main_photo = self.get_photo(main_photo_url, str(article_num) + '_0.jpeg')
-
-                    other_photo_urls = self.driver.find_elements(By.XPATH,
-                                                                 '//figure[@class="pdp-secondary-image pdp-image"]/img')
-                    other_photo = ','.join(
-                        [self.get_photo(other_photo_urls[i].get_attribute('src'), article_num + '_' + str(i + 1) + '.webp')
-                         for i in range(len(other_photo_urls))])
-
+                sizes = self.driver.find_elements(By.XPATH, '//hm-size-selector/ul/li')
+                for i in sizes:
                     self.count += 1
 
                     color = self.driver.find_element(By.CLASS_NAME, 'product-input-label').text
 
-                    article = 'H&M_' + article_num
+                    size = i.text.split('\n')[0]
+
+                    article = 'H&M_' + article_num + '_' + size
 
                     rich = self.RICH.format(name, description, article_num)
 
@@ -173,168 +228,115 @@ class Parser:
                         self.COLUMNS['Цена, руб.*'] = 'Bad price'
                     self.COLUMNS['Ссылка на главное фото*'] = main_photo
                     self.COLUMNS['Ссылки на дополнительные фото'] = other_photo
-                    self.COLUMNS['Название модели (для объединения в одну карточку)*'] = article_num[:-3]
-                    self.COLUMNS['Цвет товара'] = COLORS[color] if color in COLORS else 'разноцветный'
+                    self.COLUMNS['Объединить на одной карточке*'] = article_num[:-3]
+                    self.COLUMNS['Цвет товара*'] = COLORS[color] if color in COLORS else 'разноцветный'
+                    if size.isdigit():
+                        self.COLUMNS['Российский размер*'] = str(int(size) + 6)
+                    else:
+                        try:
+                            self.COLUMNS['Российский размер*'] = self.SIZES[size.upper()]
+                        except:
+                            self.COLUMNS['Российский размер*'] = 'Bad size'  # Если размера нету в таблице размеров
+                    self.COLUMNS['Размер производителя'] = size
                     self.COLUMNS['Название цвета'] = self.translate(color)
                     self.COLUMNS['Страна-изготовитель'] = creator
-                    self.COLUMNS['Материал'] = material
+                    self.COLUMNS['Состав материала'] = self.translate(material)
+                    self.COLUMNS['Материал'] = self.translate(main_material)
                     self.COLUMNS['Таблица размеров JSON'] = self.TABLE_OF_SIZES
                     self.COLUMNS['Rich-контент JSON'] = rich
 
                     self.result.append(self.COLUMNS.copy())
-            elif self.PARSE_TYPE == 'clothes':
-                main_material = re.split(r' \d{1,3}%', material)[0]
-                for j in colors:
-                    if self.driver.current_url == 'https://www2.hm.com/pl_pl/index.html':
-                        continue
+        elif self.PARSE_TYPE == 'shoes':
+            material = self.driver.find_element(By.XPATH, '//ul[@class="f94b22"]').text
+            main_material, internal_material, sole_material = '', '', ''
+            for i in material.split('\n'):
+                key, value = i.split(':')
+                if key == 'Strona wierzchnia':
+                    main_material = MATERIALS[value.split(' ')[0]]
+                elif key == 'Podszewka':
+                    internal_material = MATERIALS[value.split(' ')[0]]
+                elif key == 'Podeszwa zewnętrzna':
+                    sole_material = MATERIALS[value.split(' ')[0]]
+            for j in colors:
+                try:
+                    self.driver.get(j)
+                except Exception:
+                    continue
+                time.sleep(TIMEOUT)
+
+                article_num = re.search('[0-9]{5,}', self.driver.current_url)[0]
+
+                self.wait.until(EC.visibility_of_element_located(
+                    (By.XPATH, '//div[@class="product-detail-main-image-container"]/img')))
+                main_photo_url = self.driver.find_element(By.XPATH,
+                                                            '//div[@class="product-detail-main-image-container"]/img').get_attribute(
+                    'src')
+                main_photo = self.get_photo(main_photo_url, str(article_num) + '_0.jpeg')
+
+                other_photo_urls = self.driver.find_elements(By.XPATH,
+                                                                '//figure[@class="pdp-secondary-image pdp-image"]/img')
+                other_photo = ','.join([self.get_photo(
+                    other_photo_urls[i].get_attribute('src'),
+                    article_num + '_' + str(i + 1) + '.webp') for i in
+                    range(len(other_photo_urls))])
+
+                sizes = self.driver.find_elements(By.XPATH, '//hm-size-selector/ul/li')
+                for i in sizes:
+                    self.count += 1
+
+                    color = self.driver.find_element(By.CLASS_NAME, 'product-input-label').text
+
+                    size = i.text.split('\n')[0]
+
+                    article = 'H&M_' + article_num + '_' + size
+
+                    rich = self.RICH.format(name, description, article_num)
+
+                    self.COLUMNS['№'] = self.count
+                    self.COLUMNS['Артикул*'] = article
+                    self.COLUMNS['Название товара'] = name
                     try:
-                        self.driver.get(j)
-                    except Exception:
-                        continue
-                    time.sleep(TIMEOUT)
-
-                    article_num = re.search('[0-9]{5,}', self.driver.current_url)[0]
-
-                    self.wait.until(EC.visibility_of_element_located(
-                        (By.XPATH, '//div[@class="product-detail-main-image-container"]/img')))
-                    main_photo_url = self.driver.find_element(By.XPATH,
-                                                              '//div[@class="product-detail-main-image-container"]/img').get_attribute(
-                        'src')
-                    main_photo = self.get_photo(main_photo_url, str(article_num) + '_0.jpeg')
-
-                    other_photo_urls = self.driver.find_elements(By.XPATH,
-                                                                 '//figure[@class="pdp-secondary-image pdp-image"]/img')
-                    other_photo = ','.join([self.get_photo(other_photo_urls[i].get_attribute('src'),
-                                                           article_num + '_' + str(i + 1) + '.webp') for i in
-                                            range(len(other_photo_urls))])
-
-                    sizes = self.driver.find_elements(By.XPATH, '//hm-size-selector/ul/li')
-                    for i in sizes:
-                        self.count += 1
-
-                        color = self.driver.find_element(By.CLASS_NAME, 'product-input-label').text
-
-                        size = i.text.split('\n')[0]
-
-                        article = 'H&M_' + article_num + '_' + size
-
-                        rich = self.RICH.format(name, description, article_num)
-
-                        self.COLUMNS['№'] = self.count
-                        self.COLUMNS['Артикул*'] = article
-                        self.COLUMNS['Название товара'] = name
-                        try:
-                            self.COLUMNS['Цена, руб.*'] = price
-                        except:
-                            self.COLUMNS['Цена, руб.*'] = 'Bad price'
-                        self.COLUMNS['Ссылка на главное фото*'] = main_photo
-                        self.COLUMNS['Ссылки на дополнительные фото'] = other_photo
-                        self.COLUMNS['Объединить на одной карточке*'] = article_num[:-3]
-                        self.COLUMNS['Цвет товара*'] = COLORS[color] if color in COLORS else 'разноцветный'
-                        if size.isdigit():
-                            self.COLUMNS['Российский размер*'] = str(int(size) + 6)
-                        else:
-                            try:
-                                self.COLUMNS['Российский размер*'] = self.SIZES[size.upper()]
-                            except:
-                                self.COLUMNS['Российский размер*'] = 'Bad size'  # Если размера нету в таблице размеров
-                        self.COLUMNS['Размер производителя'] = size
-                        self.COLUMNS['Название цвета'] = self.translate(color)
-                        self.COLUMNS['Страна-изготовитель'] = creator
-                        self.COLUMNS['Состав материала'] = self.translate(material)
-                        self.COLUMNS['Материал'] = self.translate(main_material)
-                        self.COLUMNS['Таблица размеров JSON'] = self.TABLE_OF_SIZES
-                        self.COLUMNS['Rich-контент JSON'] = rich
-
-                        self.result.append(self.COLUMNS.copy())
-            elif self.PARSE_TYPE == 'shoes':
-                material = self.driver.find_element(By.XPATH, '//ul[@class="f94b22"]').text
-                main_material, internal_material, sole_material = '', '', ''
-                for i in material.split('\n'):
-                    key, value = i.split(':')
-                    if key == 'Strona wierzchnia':
-                        main_material = MATERIALS[value.split(' ')[0]]
-                    elif key == 'Podszewka':
-                        internal_material = MATERIALS[value.split(' ')[0]]
-                    elif key == 'Podeszwa zewnętrzna':
-                        sole_material = MATERIALS[value.split(' ')[0]]
-                for j in colors:
+                        self.COLUMNS['Цена, руб.*'] = price
+                    except:
+                        self.COLUMNS['Цена, руб.*'] = 'Bad price'
+                    self.COLUMNS['Ссылка на главное фото*'] = main_photo
+                    self.COLUMNS['Ссылки на дополнительные фото'] = other_photo
+                    self.COLUMNS['Объединить на одной карточке*'] = article_num[:-3]
+                    self.COLUMNS['Цвет товара*'] = COLORS[color] if color in COLORS else 'разноцветный'
                     try:
-                        self.driver.get(j)
-                    except Exception:
-                        continue
-                    time.sleep(TIMEOUT)
+                        self.COLUMNS['Российский размер (обуви)*'] = self.SIZES[size.upper()]
+                    except:
+                        self.COLUMNS['Российский размер (обуви)*'] = 'Bad size'  # Если размера нету в таблице размеров
+                    self.COLUMNS['Размер производителя'] = size
+                    self.COLUMNS['Название цвета'] = self.translate(color)
+                    self.COLUMNS['Страна-изготовитель'] = creator
+                    self.COLUMNS['Материал'] = main_material
+                    self.COLUMNS['Внутренний материал'] = internal_material
+                    self.COLUMNS['Материал подошвы'] = sole_material
+                    self.COLUMNS['Таблица размеров JSON'] = self.TABLE_OF_SIZES
+                    self.COLUMNS['Rich-контент JSON'] = rich
 
-                    article_num = re.search('[0-9]{5,}', self.driver.current_url)[0]
-
-                    self.wait.until(EC.visibility_of_element_located(
-                        (By.XPATH, '//div[@class="product-detail-main-image-container"]/img')))
-                    main_photo_url = self.driver.find_element(By.XPATH,
-                                                              '//div[@class="product-detail-main-image-container"]/img').get_attribute(
-                        'src')
-                    main_photo = self.get_photo(main_photo_url, str(article_num) + '_0.jpeg')
-
-                    other_photo_urls = self.driver.find_elements(By.XPATH,
-                                                                 '//figure[@class="pdp-secondary-image pdp-image"]/img')
-                    other_photo = ','.join([self.get_photo(
-                        other_photo_urls[i].get_attribute('src'),
-                        article_num + '_' + str(i + 1) + '.webp') for i in
-                        range(len(other_photo_urls))])
-
-                    sizes = self.driver.find_elements(By.XPATH, '//hm-size-selector/ul/li')
-                    for i in sizes:
-                        self.count += 1
-
-                        color = self.driver.find_element(By.CLASS_NAME, 'product-input-label').text
-
-                        size = i.text.split('\n')[0]
-
-                        article = 'H&M_' + article_num + '_' + size
-
-                        rich = self.RICH.format(name, description, article_num)
-
-                        self.COLUMNS['№'] = self.count
-                        self.COLUMNS['Артикул*'] = article
-                        self.COLUMNS['Название товара'] = name
-                        try:
-                            self.COLUMNS['Цена, руб.*'] = price
-                        except:
-                            self.COLUMNS['Цена, руб.*'] = 'Bad price'
-                        self.COLUMNS['Ссылка на главное фото*'] = main_photo
-                        self.COLUMNS['Ссылки на дополнительные фото'] = other_photo
-                        self.COLUMNS['Объединить на одной карточке*'] = article_num[:-3]
-                        self.COLUMNS['Цвет товара*'] = COLORS[color] if color in COLORS else 'разноцветный'
-                        try:
-                            self.COLUMNS['Российский размер (обуви)*'] = self.SIZES[size.upper()]
-                        except:
-                            self.COLUMNS['Российский размер (обуви)*'] = 'Bad size'  # Если размера нету в таблице размеров
-                        self.COLUMNS['Размер производителя'] = size
-                        self.COLUMNS['Название цвета'] = self.translate(color)
-                        self.COLUMNS['Страна-изготовитель'] = creator
-                        self.COLUMNS['Материал'] = main_material
-                        self.COLUMNS['Внутренний материал'] = internal_material
-                        self.COLUMNS['Материал подошвы'] = sole_material
-                        self.COLUMNS['Таблица размеров JSON'] = self.TABLE_OF_SIZES
-                        self.COLUMNS['Rich-контент JSON'] = rich
-
-                        self.result.append(self.COLUMNS.copy())
-        except TimeoutException:
-            pass
-        except Exception:
-            error = self.driver.current_url + '\n' + traceback.format_exc() + '\n'
-            with open('log.log', 'a') as f:
-                f.write(error)
+                    self.result.append(self.COLUMNS.copy())
 
     def parse(self):
         self.driver.get(self.CATEGORIE_URL)
         time.sleep(TIMEOUT)
-
-        self.driver.find_element(By.ID, 'onetrust-accept-btn-handler').click()
-
+        
         products = self.get_all_products()
         for product_url in products[:PARSE_LIMIT]:
             print(f'{products.index(product_url) + 1} of {len(products[:PARSE_LIMIT])}')
-            self.parseOne(product_url)
+            try:
+                self.parseOne(product_url)
+            except TimeoutException:
+                pass
+            except Exception:
+                if self.args.headless:
+                    self.driver = self.get_driver(True)
+                else:
+                    self.driver = self.get_driver(False)
+                error = self.driver.current_url + '\n' + traceback.format_exc() + '\n'
+                with open('log.log', 'a') as f:
+                    f.write(error)
 
     def check_exists_by_xpath(self, xpath):
         try:
