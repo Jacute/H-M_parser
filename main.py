@@ -9,7 +9,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
-from googletrans import Translator
+import translators as ts
 import re
 from datetime import datetime
 
@@ -75,18 +75,43 @@ class Parser:
             sys.exit()
 
     def get_all_products(self):
+        self.driver.get(self.CATEGORIE_URL)
+        time.sleep(TIMEOUT)
+        
         products = []
-        blocks = self.driver.find_elements(By.CLASS_NAME, 'item-link')
-        for block in blocks:
-            product_url = block.get_attribute('href')
-            if product_url != 'https://www2.hm.com/pl_pl/index.html':
-                products.append(product_url)
+        while True:
+            footer = self.driver.find_element(By.XPATH, '//footer')
+            self.driver.execute_script("arguments[0].scrollIntoView();", footer)
+            blocks = self.driver.find_elements(By.CLASS_NAME, 'c02f13')
+            for block in blocks:
+                a = block.find_element(By.XPATH, './/a')
+                product_url = a.get_attribute('href')
+                if product_url != 'https://www2.hm.com/pl_pl/index.html':
+                    products.append(product_url)
+            try:
+                self.driver.find_element(By.CSS_SELECTOR, '.f05bd4.aa68da.aaa2a2.f8c3c8.ab0e07')
+                break
+            except:
+                pass
+            try:
+                nextBtn = self.driver.find_element(By.CSS_SELECTOR, '.f05bd4.aaa2a2.ab0e07')
+            except:
+                break
+            self.driver.execute_script("arguments[0].scrollIntoView();", nextBtn)
+            time.sleep(1)
+            nextBtn.click()
+            time.sleep(5)
         products = self.delete_duplicate(products)
         return products
 
     def parseOne(self, product_url):
         self.driver.get(product_url)
-
+    
+        try:
+            brand = self.driver.find_element(By.CSS_SELECTOR, '#js-product-name h2').text.strip()
+        except Exception:
+            brand = 'H&M'
+        
         self.driver.execute_script("window.scrollTo(0, 1100)")
         time.sleep(TIMEOUT)
 
@@ -109,7 +134,7 @@ class Parser:
             creator_btn.click()
             time.sleep(TIMEOUT)
 
-            creator = self.translate(self.driver.find_element(By.XPATH, '//div[@class="a6b059"]/h3').text)
+            creator = self.translate(self.driver.find_element(By.XPATH, '//div[@class="b4bf73"]/h3').text)
             if creator == 'Инди': creator = 'Индия'
             close = self.driver.find_element(By.XPATH, '//div[@class="f10030"]/button')
             close.click()
@@ -117,11 +142,11 @@ class Parser:
         except:
             creator = 'Bad creator'
 
-        name = self.translate(self.driver.find_element(By.ID, 'js-product-name').text).strip()
+        name = self.translate(self.driver.find_element(By.XPATH, '//h1').text).strip()
 
         price = self.driver.find_element(By.ID, 'product-price').text
-        if 'Cena Klubowicza' in price:
-            price = price[:price.find('Cena Klubowicza')]
+        if 'Cena dla Klubowiczów' in price:
+            price = price[:price.find('Cena dla Klubowiczów')]
         price = re.findall(r'[0-9 ]+,\d+', price)[0].replace(',', '.').replace(' ', '').strip()
         if price == []: price = re.findall(r'\d+', price)[0].replace(',', '.').replace(' ', '').strip()
         price = self.get_hm_price(price)
@@ -178,6 +203,7 @@ class Parser:
                 self.COLUMNS['Страна-изготовитель'] = creator
                 self.COLUMNS['Материал'] = material
                 self.COLUMNS['Таблица размеров JSON'] = self.TABLE_OF_SIZES
+                self.COLUMNS['Бренд в одежде и обуви*'] = brand
                 self.COLUMNS['Rich-контент JSON'] = rich
 
                 self.result.append(self.COLUMNS.copy())
@@ -213,7 +239,7 @@ class Parser:
 
                     color = self.driver.find_element(By.CLASS_NAME, 'product-input-label').text
 
-                    size = i.text.split('\n')[0]
+                    size = i.text.split('\n')[0].strip()
 
                     article = 'H&M_' + article_num + '_' + size
 
@@ -243,6 +269,7 @@ class Parser:
                     self.COLUMNS['Состав материала'] = self.translate(material)
                     self.COLUMNS['Материал'] = self.translate(main_material)
                     self.COLUMNS['Таблица размеров JSON'] = self.TABLE_OF_SIZES
+                    self.COLUMNS['Бренд в одежде и обуви*'] = brand
                     self.COLUMNS['Rich-контент JSON'] = rich
 
                     self.result.append(self.COLUMNS.copy())
@@ -314,15 +341,14 @@ class Parser:
                     self.COLUMNS['Внутренний материал'] = internal_material
                     self.COLUMNS['Материал подошвы'] = sole_material
                     self.COLUMNS['Таблица размеров JSON'] = self.TABLE_OF_SIZES
+                    self.COLUMNS['Бренд в одежде и обуви*'] = brand
                     self.COLUMNS['Rich-контент JSON'] = rich
 
                     self.result.append(self.COLUMNS.copy())
 
     def parse(self):
-        self.driver.get(self.CATEGORIE_URL)
-        time.sleep(TIMEOUT)
-        
         products = self.get_all_products()
+        # products = ['https://www2.hm.com/pl_pl/productpage.1218895002.html']
         for product_url in products[:PARSE_LIMIT]:
             print(f'{products.index(product_url) + 1} of {len(products[:PARSE_LIMIT])}')
             try:
@@ -330,10 +356,7 @@ class Parser:
             except TimeoutException:
                 pass
             except Exception:
-                if self.args.headless:
-                    self.driver = self.get_driver(True)
-                else:
-                    self.driver = self.get_driver(False)
+                self.driver.refresh()
                 error = self.driver.current_url + '\n' + traceback.format_exc() + '\n'
                 with open('log.log', 'a') as f:
                     f.write(error)
@@ -366,11 +389,10 @@ class Parser:
         return result
 
     def translate(self, text):
-        translator = Translator()
         while True:
             try:
-                result = translator.translate(text, dest='ru', src='pl')
-                return result.text
+                result = ts.translate_text(text, to_language='ru', translator='yandex')
+                return result
             except:
                 pass
 
@@ -430,7 +452,7 @@ class Parser:
                 else:
                     ws.cell(row=4 + row, column=1 + col).value = result[row][cols[col]]
 
-        wb.save(SAVE_XLSX_PATH + CATEGORIE + '_' + f"{datetime.now()}.xlsx".replace(':', '.'))
+        wb.save(SAVE_XLSX_PATH + f"{CATEGORIE}_{datetime.now()}.xlsx".replace(':', '.'))
 
     def start(self):
         try:
